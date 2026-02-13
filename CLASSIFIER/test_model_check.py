@@ -4,7 +4,7 @@ from model import OCTDLMultiTaskModel
 
 # --- CONFIGURARE ---
 # Pune calea exactă către fișierul tău .pth de 4.8GB
-CHECKPOINT_PATH = r"C:\Users\daria\PycharmProjects\Licenta_Final\model_final.rank_0.pth"
+CHECKPOINT_PATH = r"/saved_models/model_final.rank_0.pth"
 
 def test_model():
     print("--- 1. TEST ÎNCĂRCARE CHECKPOINT ---")

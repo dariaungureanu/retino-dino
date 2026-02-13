@@ -3,7 +3,7 @@ Quick test to verify all dependencies are installed
 Run this before training to check everything is ready
 """
 
-print("🔍 Testing dependencies...\n")
+print("Testing dependencies...\n")
 
 try:
     import torch
