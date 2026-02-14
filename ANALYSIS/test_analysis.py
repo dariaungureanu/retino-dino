@@ -18,19 +18,10 @@ RESULT_DIR = "results_analysis"
 
 current_script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_script_dir)
-classifier_dir = os.path.join(project_root, 'CLASSIFIER')
 DEFAULT_MODEL_PATH = os.path.join(project_root, "saved_models", "best_classifier.pth")
 
-if not os.path.exists(classifier_dir):
-    print(f"ERROR: Can't find folder {classifier_dir}")
-    sys.exit(1)
-
-try:
-    from dataset import get_data_splits, OCTDLMultiTaskDataset
-    from model import OCTDLMultiTaskModel
-except ImportError as e:
-    print(f"Error at import: {e}")
-    sys.exit(1)
+from CLASSIFIER.dataset import get_data_splits, OCTDLMultiTaskDataset
+from CLASSIFIER.model import OCTDLMultiTaskModel
 
 def plot_confusion_matrix(cm, class_names, title, save_path):
     """Desenează și salvează matricea de confuzie."""
