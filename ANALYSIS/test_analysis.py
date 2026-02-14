@@ -20,6 +20,7 @@ classifier_dir = os.path.join(project_root, 'CLASSIFIER')
 DEFAULT_DATA_PATH = r"C:\Datasets\OCTDL_Cleaned"
 RESULT_DIR = os.path.join(project_root, "results_analysis")
 DEFAULT_MODEL_PATH = os.path.join(project_root, "saved_models", "best_classifier.pth")
+SSL_CHECKPOINT_PATH = os.path.join(project_root, "checkpoints_ssl", "checkpoint_latest.pth")
 
 if not os.path.exists(classifier_dir):
     print(f"ERROR: Can't find folder {classifier_dir}")
@@ -79,11 +80,16 @@ def main():
     test_loader = DataLoader(test_ds, batch_size=32, shuffle=False, num_workers=4)
 
     # 3. Load Model
-    print(f" Loading Model from: {args.model_path}")
-    # Nota: checkpoint_path e gol aici pentru că încărcăm state_dict manual mai jos
-    model = OCTDLMultiTaskModel(checkpoint_path="dummy", num_diseases=len(disease_map),
+    init_checkpoint = SSL_CHECKPOINT_PATH
+    if not os.path.exists(init_checkpoint):
+        print(f" Warning: Can't find {SSL_CHECKPOINT_PATH}")
+        init_checkpoint = args.model_path
+
+    print(f" Init model structure using: {init_checkpoint}")
+    model = OCTDLMultiTaskModel(checkpoint_path=init_checkpoint, num_diseases=len(disease_map),
                                 num_conditions=len(condition_map))
 
+    print(f" Loading Model from: {args.model_path}")
     state_dict = torch.load(args.model_path, map_location=args.device)
     model.load_state_dict(state_dict)
     model.to(args.device)
