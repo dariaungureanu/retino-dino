@@ -131,6 +131,13 @@ class ModelWrapper(torch.nn.Module):
         # Model returns (disease, condition). Take only disease for Grad-CAM
         return self.model(x)[0]
 
+def reshape_transform(tensor, height=14, width=14):
+    result = tensor[:, 1:, :]
+    grid_size = int(np.sqrt(result.size(1)))
+    result = result.reshape(tensor.size(0), grid_size, grid_size, tensor.size(2))
+    result = result.transpose(2, 3).transpose(1, 2)
+    return result
+
 # --- GRAD-CAM VISUALIZATION ---
 def plot_gradcam(model, dataset, idx_to_disease, num_samples=4):
     try:
@@ -138,9 +145,11 @@ def plot_gradcam(model, dataset, idx_to_disease, num_samples=4):
         from pytorch_grad_cam.utils.image import show_cam_on_image
 
         print("Generating GradCAM heatmaps...")
+        for param in model.backbone.parameters():
+            param.requires_grad = True
         gradcam_model = ModelWrapper(model)
         target_layers = [model.backbone.blocks[-1].norm1]
-        cam = GradCAM(model=gradcam_model, target_layers=target_layers)
+        cam = GradCAM(model=gradcam_model, target_layers=target_layers, reshape_transform=reshape_transform)
 
         indices = np.random.choice(len(dataset), num_samples, replace=False)
 
