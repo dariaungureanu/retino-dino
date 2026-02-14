@@ -13,15 +13,29 @@ from sklearn.metrics import classification_report, confusion_matrix
 import sys
 
 # --- CONFIG ---
-DEFAULT_DATA_PATH = r"C:\Datasets\OCTDL_Cleaned"
-RESULT_DIR = "results_analysis"
-
 current_script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_script_dir)
+classifier_dir = os.path.join(project_root, 'CLASSIFIER')
+
+DEFAULT_DATA_PATH = r"C:\Datasets\OCTDL_Cleaned"
+RESULT_DIR = os.path.join(project_root, "results_analysis")
 DEFAULT_MODEL_PATH = os.path.join(project_root, "saved_models", "best_classifier.pth")
 
-from CLASSIFIER.dataset import get_data_splits, OCTDLMultiTaskDataset
-from CLASSIFIER.model import OCTDLMultiTaskModel
+if not os.path.exists(classifier_dir):
+    print(f"ERROR: Can't find folder {classifier_dir}")
+    sys.exit(1)
+
+if classifier_dir not in sys.path:
+    sys.path.insert(0, classifier_dir)
+print(f" Added to path: {classifier_dir}")
+
+try:
+    from dataset import get_data_splits, OCTDLMultiTaskDataset
+    from model import OCTDLMultiTaskModel
+except ImportError as e:
+    print(f"Error at import: {e}")
+    sys.exit(1)
+
 
 def plot_confusion_matrix(cm, class_names, title, save_path):
     """Desenează și salvează matricea de confuzie."""
