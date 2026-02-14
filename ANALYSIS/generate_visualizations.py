@@ -122,6 +122,15 @@ def plot_tsne(model, loader, idx_to_disease):
     print(f"t-SNE plot saved to: {save_path}")
 
 
+class ModelWrapper(torch.nn.Module):
+    def __init__(self, model):
+        super(ModelWrapper, self).__init__()
+        self.model = model
+
+    def forward(self, x):
+        # Model returns (disease, condition). Take only disease for Grad-CAM
+        return self.model(x)[0]
+
 # --- GRAD-CAM VISUALIZATION ---
 def plot_gradcam(model, dataset, idx_to_disease, num_samples=4):
     try:
@@ -129,9 +138,9 @@ def plot_gradcam(model, dataset, idx_to_disease, num_samples=4):
         from pytorch_grad_cam.utils.image import show_cam_on_image
 
         print("Generating GradCAM heatmaps...")
-        # Target the last norm layer of DINOv2
+        gradcam_model = ModelWrapper(model)
         target_layers = [model.backbone.blocks[-1].norm1]
-        cam = GradCAM(model=model, target_layers=target_layers)
+        cam = GradCAM(model=gradcam_model, target_layers=target_layers)
 
         indices = np.random.choice(len(dataset), num_samples, replace=False)
 
