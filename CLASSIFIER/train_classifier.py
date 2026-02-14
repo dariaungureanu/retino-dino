@@ -6,22 +6,17 @@ from torchvision import transforms
 import wandb
 import os
 import argparse
-import numpy as np
 from tqdm import tqdm
 from sklearn.metrics import f1_score, accuracy_score
 
-# Importurile tale locale
 from dataset import get_data_splits, OCTDLMultiTaskDataset
 from model import OCTDLMultiTaskModel
 
-# --- CONFIGURARE AUTOMATĂ ---
-# Căutăm checkpoint-ul în folderul vecin (1_PRETRAIN)
 DEFAULT_SSL_CHECKPOINT = os.path.join("..", "checkpoints_ssl", "checkpoint_latest.pth")
 
-# Hyperparameters pentru Server
-BATCH_SIZE = 32  # RTX 3060 duce 32 sau chiar 64 la 224px
+BATCH_SIZE = 32
 LEARNING_RATE = 1e-4
-EPOCHS = 30  # Antrenare serioasă
+EPOCHS = 30
 LAMBDA_CONDITION = 1.0
 WEIGHT_DECAY = 1e-4
 
@@ -147,28 +142,24 @@ def main():
     wandb.init(project="Licenta-Classifier-Final", config=args)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"🚀 Device: {device}")
+    print(f"Device: {device}")
 
     os.makedirs(args.save_dir, exist_ok=True)
 
-    # 1. Load Splits
-    print(f"📂 Loading Data from: {args.data_path}")
+    print(f"Loading data from: {args.data_path}")
     train_df, val_df, test_df, disease_map, condition_map = get_data_splits(csv_path)
 
-    # 2. Add Integer Columns
     train_df['label_disease_int'] = train_df['label_disease'].map(disease_map)
     train_df['label_condition_int'] = train_df['label_condition_raw'].map(lambda x: condition_map.get(x, -100))
 
-    # 3. Compute Class Weights
-    print("⚖️ Computing Class Weights...")
+    print("Computing class weights...")
     weights_d = compute_class_weights(train_df, 'label_disease_int', len(disease_map))
     weights_c = compute_class_weights(train_df, 'label_condition_int', len(condition_map), ignore_index=-100)
     weights_d = weights_d.to(device)
     weights_c = weights_c.to(device)
 
-    # 4. Datasets & Transforms (224px - Esential!)
     train_transform = transforms.Compose([
-        transforms.Resize((224, 224)),  # Resize on-the-fly
+        transforms.Resize((224, 224)),
         transforms.RandomHorizontalFlip(),
         transforms.RandomRotation(15),
         transforms.ToTensor(),
@@ -184,21 +175,19 @@ def main():
     train_ds = OCTDLMultiTaskDataset(train_df, args.data_path, train_transform, disease_map, condition_map)
     val_ds = OCTDLMultiTaskDataset(val_df, args.data_path, val_transform, disease_map, condition_map)
 
-    # Workers=4 pentru viteză
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, num_workers=4, pin_memory=True)
     val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False, num_workers=4)
 
-    # 5. Model
-    print(f"⬇️ Loading SSL Checkpoint from: {args.checkpoint}")
+    print(f"Loading SSL checkpoint from: {args.checkpoint}")
     if not os.path.exists(args.checkpoint):
-        print(f"⚠️ WARNING: Checkpoint file NOT FOUND at {args.checkpoint}")
-        print("⚠️ Training from scratch (random weights)!")
+        print(f"Warning: Checkpoint file not found at {args.checkpoint}")
+        print("Training from scratch with random weights.")
 
     model = OCTDLMultiTaskModel(
         checkpoint_path=args.checkpoint,
         num_diseases=len(disease_map),
         num_conditions=len(condition_map),
-        freeze_backbone=True  # Înghețăm backbone-ul inițial
+        freeze_backbone=True
     ).to(device)
 
     optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=WEIGHT_DECAY)
@@ -206,7 +195,6 @@ def main():
     criterion_disease = nn.CrossEntropyLoss(weight=weights_d)
     criterion_condition = nn.CrossEntropyLoss(weight=weights_c, ignore_index=-100)
 
-    # 6. Training Loop
     best_f1 = 0.0
 
     for epoch in range(1, args.epochs + 1):
@@ -218,9 +206,9 @@ def main():
             model, val_loader, criterion_disease, criterion_condition, device, epoch
         )
 
-        print(f"\n✨ Ep {epoch}/{args.epochs} Results:")
-        print(f"   [Train] Loss: {t_loss:.3f} | Dis F1: {t_f1_d:.3f}")
-        print(f"   [Val]   Loss: {v_loss:.3f} | Dis F1: {v_f1_d:.3f} (Best: {best_f1:.3f})")
+        print(f"\nEpoch {epoch}/{args.epochs} Results:")
+        print(f"   [Train] Loss: {t_loss:.3f} | Disease F1: {t_f1_d:.3f}")
+        print(f"   [Val]   Loss: {v_loss:.3f} | Disease F1: {v_f1_d:.3f} (Best: {best_f1:.3f})")
 
         wandb.log({
             "epoch": epoch,
@@ -229,11 +217,10 @@ def main():
             "train_condition_f1": t_f1_c, "val_condition_f1": v_f1_c
         })
 
-        # Save Best Model
         if v_f1_d > best_f1:
             best_f1 = v_f1_d
             torch.save(model.state_dict(), os.path.join(args.save_dir, "best_classifier.pth"))
-            print("🏆 Model Saved!")
+            print("Model saved with improved F1 score.")
 
     wandb.finish()
 

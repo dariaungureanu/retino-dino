@@ -8,7 +8,6 @@ import wandb
 from tqdm import tqdm
 from dataset_ssl import OCTDL_SSL_Dataset
 
-# --- CONFIGURARE DEFAULT ---
 DEFAULT_DATA_ROOT = r"C:\Datasets\OCTDL_Cleaned"
 SAVE_DIR = "checkpoints_ssl"
 
@@ -35,48 +34,43 @@ def main():
     parser.add_argument('--data_path', type=str, default=DEFAULT_DATA_ROOT)
     parser.add_argument('--save_dir', type=str, default=SAVE_DIR)
     parser.add_argument('--epochs', type=int, default=20)
-
-    # --- MODIFICARE: Batch Size default marit la 16 sau 32 ---
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--lr', type=float, default=5e-6)
     args = parser.parse_args()
 
-    # Re-init WandB cu nume nou ca să nu amestecăm cu run-ul crăpat
     wandb.init(project="Licenta-SSL-Turbo", config=args)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"🚀 Device: {device}")
+    print(f"Device: {device}")
 
     os.makedirs(args.save_dir, exist_ok=True)
 
-    # 1. Dataset
     dataset = OCTDL_SSL_Dataset(args.data_path)
 
     dataloader = DataLoader(
         dataset,
         batch_size=args.batch_size,
         shuffle=True,
-        num_workers=4,  # <<-- SECRETUL VITEZEI
+        num_workers=4,
         pin_memory=True,
         drop_last=True,
-        persistent_workers=True  # <<-- Ține workers activi
+        persistent_workers=True
     )
-    print(f"✅ Loaded {len(dataset)} images. Batch Size: {args.batch_size}")
+    print(f"Loaded {len(dataset)} images. Batch size: {args.batch_size}")
 
-    # 2. Model
-    print("⬇️ Loading DINOv2 ViT-Large...")
+    print("Loading DINOv2 ViT-Large...")
     student = torch.hub.load('facebookresearch/dinov2', 'dinov2_vitl14').to(device)
 
     for name, param in student.named_parameters():
         if "blocks.23" not in name and "norm" not in name:
             param.requires_grad = False
-    print("❄️ Backbone frozen (except last block).")
+    print("Backbone frozen (except last block).")
 
     head = SimpleDINOHead(1024).to(device)
     optimizer = optim.AdamW(list(student.parameters()) + list(head.parameters()), lr=args.lr)
     criterion = nn.CrossEntropyLoss()
 
-    print("🏁 Starting Pre-training (Turbo Mode)...")
+    print("Starting pre-training...")
     student.train()
     try:
         for epoch in range(args.epochs):
@@ -105,26 +99,25 @@ def main():
             avg_loss = total_loss / len(dataloader)
             wandb.log({"ssl_loss": avg_loss, "epoch": epoch})
 
-            # Save every epoch
             save_path = os.path.join(args.save_dir, "checkpoint_latest.pth")
             torch.save(student.state_dict(), save_path)
-            print(f"💾 Saved: {save_path}")
+            print(f"Saved: {save_path}")
 
     except torch.cuda.OutOfMemoryError:
-        print("\n⚠️ CRITICAL: CUDA Out Of Memory! Saving emergency checkpoint...")
+        print("\nCritical: CUDA out of memory. Saving emergency checkpoint...")
         torch.save(student.state_dict(), os.path.join(args.save_dir, "checkpoint_oom.pth"))
-        print("💾 Emergency save successful: checkpoint_oom.pth")
+        print("Emergency save successful: checkpoint_oom.pth")
         torch.cuda.empty_cache()
-        raise  # Aruncăm eroarea ca să știm că a crăpat, dar datele sunt salvate
+        raise
 
     except KeyboardInterrupt:
-        print("\n⚠️ Training interrupted by user. Saving checkpoint...")
+        print("\nTraining interrupted by user. Saving checkpoint...")
         torch.save(student.state_dict(), os.path.join(args.save_dir, "checkpoint_interrupted.pth"))
-        print("💾 Save successful.")
+        print("Save successful.")
 
-    print("✅ Done!")
+    print("Pre-training complete.")
     wandb.finish()
 
 
 if __name__ == "__main__":
-    main()  # Aceasta este cheia pe Windows pentru num_workers > 0
+    main()

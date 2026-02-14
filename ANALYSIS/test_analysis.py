@@ -1,11 +1,9 @@
 import torch
-import torch.nn as nn
 from torch.utils.data import DataLoader
 from torchvision import transforms
 import os
 import argparse
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from tqdm import tqdm
@@ -39,7 +37,7 @@ except ImportError as e:
 
 
 def plot_confusion_matrix(cm, class_names, title, save_path):
-    """Desenează și salvează matricea de confuzie."""
+    """Draw and save a confusion matrix heatmap."""
     plt.figure(figsize=(10, 8))
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=class_names, yticklabels=class_names)
     plt.xlabel('Predicted')
@@ -61,11 +59,10 @@ def main():
     os.makedirs(RESULT_DIR, exist_ok=True)
     print(f" Device: {args.device}")
 
-    # 1. Load Data Splits (Doar TEST ne interesează)
+    # 1. Load Data Splits and Mappings
     csv_path = os.path.join(args.data_path, "OCTDL_clean_metadata.csv")
     _, _, test_df, disease_map, condition_map = get_data_splits(csv_path)
 
-    # Inversăm maparea (0 -> 'AMD') pentru grafice
     idx_to_disease = {v: k for k, v in disease_map.items()}
     idx_to_condition = {v: k for k, v in condition_map.items()}
 
@@ -116,26 +113,21 @@ def main():
             all_preds_c.extend(preds_c)
             all_labels_c.extend(labels_c.numpy())
 
-    # 5. Metrics & Plots - DISEASE
     print("\n" + "=" * 30)
     print(" DISEASE CLASSIFICATION REPORT")
     print("=" * 30)
 
-    # Convertim indicii în nume de clase
     disease_names = [idx_to_disease[i] for i in range(len(disease_map))]
 
     print(classification_report(all_labels_d, all_preds_d, target_names=disease_names, digits=4))
 
-    # Matricea de Confuzie
     cm_d = confusion_matrix(all_labels_d, all_preds_d)
     plot_confusion_matrix(cm_d, disease_names, "Disease Confusion Matrix", os.path.join(RESULT_DIR, "cm_disease.png"))
 
-    # 6. Metrics & Plots - CONDITION
     print("\n" + "=" * 30)
     print(" CONDITION CLASSIFICATION REPORT")
     print("=" * 30)
 
-    # Filtrăm clasa IGNORE (-100)
     valid_mask = np.array(all_labels_c) != -100
     clean_preds_c = np.array(all_preds_c)[valid_mask]
     clean_labels_c = np.array(all_labels_c)[valid_mask]
@@ -146,12 +138,11 @@ def main():
 
     print(classification_report(clean_labels_c, clean_preds_c, target_names=target_names_subset, digits=4))
 
-    # Matricea de Confuzie Condition
     cm_c = confusion_matrix(clean_labels_c, clean_preds_c)
     plot_confusion_matrix(cm_c, target_names_subset, "Condition Confusion Matrix",
                           os.path.join(RESULT_DIR, "cm_condition.png"))
 
-    print(f"\n Done! Check the '{RESULT_DIR}' folder for PNG plots.")
+    print(f"\n Analysis complete. Check the '{RESULT_DIR}' folder for visualization plots.")
 
 
 if __name__ == "__main__":
