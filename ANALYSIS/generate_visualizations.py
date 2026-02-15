@@ -270,6 +270,9 @@ def generate_cam_for_task_compare_pred_true(
         # true label for the head
         current_label = label_d if head_index == 0 else label_c
         label_val = int(current_label.item() if isinstance(current_label, torch.Tensor) else current_label)
+        if label_val == -100:
+            print(f"Skipping sample {idx} (ignore label -100)")
+            continue
 
         # forward for pred/conf
         with torch.no_grad():
