@@ -33,15 +33,22 @@ def load_custom_backbone(checkpoint_path):
 
 
 class OCTDLMultiTaskModel(nn.Module):
-    def __init__(self, checkpoint_path, num_diseases=7, num_conditions=8, freeze_backbone=True):
+    def __init__(self, checkpoint_path, num_diseases=7, num_conditions=8, freeze_backbone=True, unfreeze_last_block=False):
         super().__init__()
 
         self.backbone = load_custom_backbone(checkpoint_path)
 
         if freeze_backbone:
-            for param in self.backbone.parameters():
-                param.requires_grad = False
-            print("Backbone is frozen. Only classification heads will be trained.")
+            for name, param in self.backbone.named_parameters():
+                if unfreeze_last_block and ("blocks.23" in name or "norm" in name):
+                    param.requires_grad = True
+                else:
+                    param.requires_grad = False
+
+            if unfreeze_last_block:
+                print("Backbone is mostly frozen, BUT the last block (blocks.23) is UNFROZEN.")
+            else:
+                print("Backbone is fully frozen. Only classification heads will be trained.")
         else:
             print("Backbone is unfrozen. Full fine-tuning enabled.")
 

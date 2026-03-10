@@ -15,7 +15,7 @@ from model import OCTDLMultiTaskModel
 DEFAULT_SSL_CHECKPOINT = os.path.join("..", "checkpoints_ssl", "checkpoint_latest.pth")
 
 BATCH_SIZE = 32
-LEARNING_RATE = 1e-4
+LEARNING_RATE = 5e-5 #we 5e-5 need less for training a part of dino and 1e-4 for the whole backbone frozen
 EPOCHS = 30
 LAMBDA_CONDITION = 1.0
 WEIGHT_DECAY = 1e-4
@@ -136,10 +136,10 @@ def main():
     parser.add_argument('--lr', type=float, default=LEARNING_RATE)
     args = parser.parse_args()
 
-    # CSV-ul e in interiorul folderului de date
     csv_path = os.path.join(args.data_path, "OCTDL_clean_metadata.csv")
 
-    wandb.init(project="Licenta-Classifier-Final", config=args)
+    # wandb.init(project="Licenta-Classifier-Final", config=args)
+    wandb.init(project="Licenta-Classifier-Unfrozen-Last-Block", config=args)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
@@ -187,7 +187,8 @@ def main():
         checkpoint_path=args.checkpoint,
         num_diseases=len(disease_map),
         num_conditions=len(condition_map),
-        freeze_backbone=True
+        freeze_backbone=True,
+        unfreeze_last_block=True
     ).to(device)
 
     optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=WEIGHT_DECAY)
@@ -219,8 +220,9 @@ def main():
 
         if v_f1_d > best_f1:
             best_f1 = v_f1_d
-            torch.save(model.state_dict(), os.path.join(args.save_dir, "best_classifier.pth"))
-            print("Model saved with improved F1 score.")
+            save_path = os.path.join(args.save_dir, "best_classifier_unfrozen.pth")
+            torch.save(model.state_dict(), save_path)
+            print(f"Model saved with improved F1 score as: {save_path}")
 
     wandb.finish()
 
