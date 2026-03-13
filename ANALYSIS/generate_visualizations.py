@@ -22,7 +22,8 @@ os.makedirs(output_dir, exist_ok=True)
 CLASSIFIER_DIR = os.path.join(project_root, "CLASSIFIER")
 
 DATASET_PATH = r"C:\Datasets\OCTDL_Cleaned"
-MODEL_PATH = os.path.join(project_root, "saved_models", "best_classifier.pth")
+MODEL_PATH = os.path.join(project_root, "saved_models", "best_classifier_unfrozen.pth")
+#MODEL_PATH = os.path.join(project_root, "saved_models", "best_classifier.pth")
 SSL_CHECKPOINT_PATH = os.path.join(project_root, "checkpoints_ssl", "checkpoint_latest.pth")
 
 if CLASSIFIER_DIR not in sys.path:
@@ -72,6 +73,7 @@ def load_resources():
         checkpoint_path=init_checkpoint,
         num_diseases=len(disease_map),
         num_conditions=len(condition_map),
+        unfreeze_last_block=True
     )
 
     if os.path.exists(MODEL_PATH):

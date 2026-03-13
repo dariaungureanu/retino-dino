@@ -17,7 +17,8 @@ classifier_dir = os.path.join(project_root, 'CLASSIFIER')
 
 DEFAULT_DATA_PATH = r"C:\Datasets\OCTDL_Cleaned"
 RESULT_DIR = os.path.join(project_root, "results_analysis")
-DEFAULT_MODEL_PATH = os.path.join(project_root, "saved_models", "best_classifier.pth")
+DEFAULT_MODEL_PATH = os.path.join(project_root, "saved_models", "best_classifier_unfrozen.pth")
+# DEFAULT_MODEL_PATH = os.path.join(project_root, "saved_models", "best_classifier.pth")
 SSL_CHECKPOINT_PATH = os.path.join(project_root, "checkpoints_ssl", "checkpoint_latest.pth")
 
 if not os.path.exists(classifier_dir):
@@ -84,7 +85,7 @@ def main():
 
     print(f" Init model structure using: {init_checkpoint}")
     model = OCTDLMultiTaskModel(checkpoint_path=init_checkpoint, num_diseases=len(disease_map),
-                                num_conditions=len(condition_map))
+                                num_conditions=len(condition_map), unfreeze_last_block=True)
 
     print(f" Loading Model from: {args.model_path}")
     state_dict = torch.load(args.model_path, map_location=args.device)
