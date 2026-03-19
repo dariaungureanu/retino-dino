@@ -6,7 +6,7 @@ import torchvision.transforms as transforms
 
 
 class DINO_Dataset(Dataset):
-    def __init__(self, root_dir, global_size=224, local_size=96, local_crops_number=4):
+    def __init__(self, root_dir, global_size=224, local_size=98, local_crops_number=4):
         self.root_dir = root_dir
         self.local_crops_number = local_crops_number
         self.image_paths = []

@@ -104,7 +104,7 @@ def main():
     dataset = DINO_Dataset(
         args.data_path,
         global_size=224,
-        local_size=96,
+        local_size=98,
         local_crops_number=args.local_crops_number
     )
 
