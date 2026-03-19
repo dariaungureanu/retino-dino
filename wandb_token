@@ -2,4 +2,4 @@ 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
 
 .\venv\Scripts\activate
 
-python ANALYSIS/test_analysis.py --data_path "C:\Datasets\OCTDL_Cleaned" --model_path "C:\Users\yolof\OneDrive\Desktop\retino-dino\saved_models\best_classifier.pth"
+python ANALYSIS/test_analysis.py --data_path "C:\Datasets\OCTDL_Cleaned" --model_path "C:\Users\yolof\OneDrive\Desktop\retino-dino\saved_models\best_classifier_unfrozen.pth"
