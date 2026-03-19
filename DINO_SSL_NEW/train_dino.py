@@ -10,7 +10,7 @@ import copy
 import wandb
 from dataset_dino import DINO_Dataset
 DEFAULT_DATA_ROOT = r"C:\Datasets\OCTDL_Cleaned"
-SAVE_DIR = "checkpoints_domain_adapt"
+SAVE_DIR = "checkpoints_dino_40k"
 class DINOHead(nn.Module):
     def __init__(self, in_dim, hidden_dim=2048, bottleneck_dim=256, out_dim=65536):
         super().__init__()
@@ -89,14 +89,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_path', type=str, default=DEFAULT_DATA_ROOT)
     parser.add_argument('--save_dir', type=str, default=SAVE_DIR)
-    parser.add_argument('--epochs', type=int, default=10)
+    parser.add_argument('--epochs', type=int, default=50)
     parser.add_argument('--batch_size', type=int, default=16)
     parser.add_argument('--lr', type=float, default=1e-5)
     parser.add_argument('--local_crops_number', type=int, default=6)
     parser.add_argument('--ema_momentum', type=float, default=0.996)
     args = parser.parse_args()
 
-    wandb.init(project="Licenta-SSL-DINOStyle", config=args)
+    wandb.init(project="Licenta-SSL-40K-Final", config=args)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     os.makedirs(args.save_dir, exist_ok=True)
@@ -112,7 +112,7 @@ def main():
         dataset,
         batch_size=args.batch_size,
         shuffle=True,
-        num_workers=4,
+        num_workers=8,
         pin_memory=True,
         drop_last=True,
         persistent_workers=True
@@ -133,7 +133,7 @@ def main():
 
     optimizer = optim.AdamW(student.parameters(), lr=args.lr, weight_decay=1e-4)
     dino_loss = DINOLoss(out_dim=65536).to(device)
-
+    best_loss = float('inf')
     print("Starting DINO-Style Pre-training...")
     for epoch in range(args.epochs):
         student.train()
@@ -169,10 +169,18 @@ def main():
                 "teacher": teacher.state_dict(),
                 "epoch": epoch + 1,
             },
-            os.path.join(args.save_dir, "dinov2_base_adapted_latest.pth")
+            os.path.join(args.save_dir, "dinov2_base_40k_latest.pth")
         )
         print(f"Saved Epoch {epoch + 1}. Avg Loss: {total_loss / len(dataloader):.4f}")
-
+        if avg_loss < best_loss:
+            best_loss = avg_loss
+            torch.save(
+                student.state_dict(),
+                os.path.join(args.save_dir, "dinov2_base_40k_BEST.pth")
+            )
+            print(f"New: {best_loss:.4f}! Checkpoint BEST saved.")
+        else:
+            print(f"Saved Epoch {epoch + 1}. Avg Loss: {avg_loss:.4f}")
     wandb.finish()
 
 if __name__ == "__main__":
