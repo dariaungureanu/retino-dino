@@ -150,9 +150,13 @@ def main():
 
     print("Loading DINOv2-BASE (ViT-B/14)...")
 
-    backbone = torch.hub.load('facebookresearch/dinov2', 'dinov2_vitb14')
-    student = DINOModel(backbone, DINOHead(768)).to(device)
-    teacher = copy.deepcopy(student).to(device)
+    backbone_student = torch.hub.load('facebookresearch/dinov2', 'dinov2_vitb14')
+    backbone_teacher = torch.hub.load('facebookresearch/dinov2', 'dinov2_vitb14')
+
+    student = DINOModel(backbone_student, DINOHead(768)).to(device)
+    teacher = DINOModel(backbone_teacher, DINOHead(768)).to(device)
+
+    teacher.load_state_dict(student.state_dict())
 
     for param in student.parameters():
         param.requires_grad = True
