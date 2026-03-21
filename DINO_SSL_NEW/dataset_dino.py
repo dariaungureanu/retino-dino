@@ -20,8 +20,10 @@ class DINO_Dataset(Dataset):
         self.global_transform1 = transforms.Compose([
             transforms.RandomResizedCrop(global_size, scale=(0.4, 1.0)),
             transforms.RandomHorizontalFlip(),
-            transforms.ColorJitter( brightness=0.2, contrast=0.2, saturation=0.0, hue=0.0),
+            transforms.RandomRotation(degrees=10),
+            transforms.ColorJitter( brightness=0.4, contrast=0.4, saturation=0.0, hue=0.0),
             transforms.ToTensor(),
+            transforms.Grayscale(num_output_channels=3),
             transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
 
@@ -29,8 +31,10 @@ class DINO_Dataset(Dataset):
         self.global_transform2 = transforms.Compose([
             transforms.RandomResizedCrop(global_size, scale=(0.4, 1.0)),
             transforms.RandomHorizontalFlip(),
-            transforms.GaussianBlur(kernel_size=5, sigma=(0.1, 1.0)),
+            transforms.RandomRotation(degrees=10),
+            transforms.GaussianBlur(kernel_size=5, sigma=(0.1, 0.5)),
             transforms.ToTensor(),
+            transforms.Grayscale(num_output_channels=3),
             transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
 
@@ -38,8 +42,10 @@ class DINO_Dataset(Dataset):
         self.local_transform = transforms.Compose([
             transforms.RandomResizedCrop(local_size, scale=(0.05, 0.4)),
             transforms.RandomHorizontalFlip(),
-            transforms.ColorJitter( brightness=0.2, contrast=0.2, saturation=0.0, hue=0.0),
+            transforms.RandomRotation(degrees=10),
+            transforms.ColorJitter( brightness=0.4, contrast=0.4, saturation=0.0, hue=0.0),
             transforms.ToTensor(),
+            transforms.Grayscale(num_output_channels=3),
             transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
 
