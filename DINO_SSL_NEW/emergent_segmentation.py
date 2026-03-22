@@ -82,6 +82,7 @@ def main():
     print("Success! Saved as 'thesis_dinov2_pca_dme.png'.")
     plt.show()
 
+def main():
 
 if __name__ == '__main__':
     main()
