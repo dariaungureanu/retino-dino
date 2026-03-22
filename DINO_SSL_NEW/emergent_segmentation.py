@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import cv2
 import numpy as np
 from sklearn.decomposition import PCA
+import argparse
 # --- USER SETTINGS ---
 IMAGE_PATH = r"D:\Ungureanu_Daria\OCTDL_Cleaned\DME\dme_1434389_1.jpg"
 CHECKPOINT_PATH = r"D:\Ungureanu_Daria\retino-dino\checkpoints_dino_oct_optimized\dinov2_oct_opt_latest.pth"
@@ -14,7 +15,10 @@ PATCH_SIZE = 14
 IMG_SIZE = 518  # Must be a multiple of 14 (37 * 14 = 518)
 GRID_SIZE = IMG_SIZE // PATCH_SIZE
 
-def main():
+def main(image_path=None):
+    if image_path is None:
+        image_path = IMAGE_PATH
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
@@ -44,7 +48,7 @@ def main():
         transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
     ])
 
-    img_pil = Image.open(IMAGE_PATH).convert("RGB")
+    img_pil = Image.open(image_path).convert("RGB")
     img_original = img_pil.resize((IMG_SIZE, IMG_SIZE))
     img_tensor = transform(img_pil).unsqueeze(0).to(device)
 
@@ -82,7 +86,9 @@ def main():
     print("Success! Saved as 'thesis_dinov2_pca_dme.png'.")
     plt.show()
 
-def main():
-
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser(description="DINOv2 emergent segmentation visualization")
+    parser.add_argument('--image_path', '--image', type=str, default=IMAGE_PATH, dest='image_path',
+                        help=f'Path to the image file (default: {IMAGE_PATH})')
+    args = parser.parse_args()
+    main(image_path=args.image_path)
