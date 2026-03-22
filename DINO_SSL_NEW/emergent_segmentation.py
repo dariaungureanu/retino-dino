@@ -15,9 +15,11 @@ PATCH_SIZE = 14
 IMG_SIZE = 518  # Must be a multiple of 14 (37 * 14 = 518)
 GRID_SIZE = IMG_SIZE // PATCH_SIZE
 
-def main(image_path=None):
+def main(image_path=None, output_name=None):
     if image_path is None:
         image_path = IMAGE_PATH
+    if output_name is None:
+        output_name = "thesis_dinov2_pca.png"
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
@@ -82,13 +84,15 @@ def main(image_path=None):
     axes[2].axis("off")
 
     plt.tight_layout()
-    plt.savefig("thesis_dinov2_pca_dme.png", dpi=300, bbox_inches='tight')
-    print("Success! Saved as 'thesis_dinov2_pca_dme.png'.")
+    plt.savefig(output_name, dpi=300, bbox_inches='tight')
+    print(f"Success! Saved as '{output_name}'.")
     plt.show()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="DINOv2 emergent segmentation visualization")
     parser.add_argument('--image_path', '--image', type=str, default=IMAGE_PATH, dest='image_path',
                         help=f'Path to the image file (default: {IMAGE_PATH})')
+    parser.add_argument('--output', type=str, default="thesis_dinov2_pca_dme.png", dest='output_name',
+                        help='Output filename for the visualization (default: thesis_dinov2_pca_dme.png)')
     args = parser.parse_args()
-    main(image_path=args.image_path)
+    main(image_path=args.image_path, output_name=args.output_name)
