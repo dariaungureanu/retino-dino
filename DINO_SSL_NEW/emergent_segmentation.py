@@ -45,19 +45,10 @@ def main():
     img_pil = Image.open(IMAGE_PATH).convert("RGB")
     img_tensor = transform(img_pil).unsqueeze(0).to(device)
 
-    attention_maps = []
-    def hook_fn(module, input, output):
-        attention_maps.append(input[0])
-    hook = model.blocks[-1].attn.attn_drop.register_forward_hook(hook_fn)
+    with torch.no_grad():
+        attn = model.get_last_selfattention(img_tensor)
 
-    #force memory_efficient off -> i dont use xformers
-    with torch.backends.cuda.sdp_kernel(enable_flash=False, enable_math=True, enable_mem_efficient=False):
-        with torch.no_grad():
-            model(img_tensor)
-
-    hook.remove()
-
-    attn = attention_maps[0][0] # Shape: (12_heads, 257_tokens, 257_tokens)
+    attn = attn[0] # remove batch dim -> [12, 257, 257]
     cls_attn = attn[:, 0, 1:] # Shape: (12_heads, 256_patches)
 
     grid_size = int(np.sqrt(cls_attn.shape[1]))  # Should be 16 (224 / 14)
