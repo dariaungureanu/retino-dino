@@ -9,7 +9,7 @@ import numpy as np
 
 # --- USER SETTINGS ---
 IMAGE_PATH = r"D:\Ungureanu_Daria\OCTDL_Cleaned\DME\dme_1434389_1.jpg"
-CHECKPOINT_PATH = r"D:\Ungureanu_Daria\retino-dino\checkpoints_dino_oct_optimized\dinov2_oct_opt_BEST.pth"
+CHECKPOINT_PATH = r"D:\Ungureanu_Daria\retino-dino\checkpoints_dino_oct_optimized\dinov2_oct_opt_latest.pth"
 
 
 def main():
