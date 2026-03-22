@@ -52,20 +52,13 @@ def main():
         outputs = model.forward_features(img_tensor)
 
     patch_tokens = outputs['x_norm_patchtokens'][0].cpu().numpy()
-    patch_norms = np.linalg.norm(patch_tokens, axis=-1)
-
-    threshold = np.percentile(patch_norms, 15)  # Assuming roughly 15% of the image is black void
-    foreground_mask = patch_norms > threshold
 
     print("Running PCA to reduce 768 dimensions to RGB...")
     pca = PCA(n_components=3)
-    fg_features = pca.fit_transform(patch_tokens[foreground_mask])
+    pca_features = pca.fit_transform(patch_tokens)
     for i in range(3):
-        fg_features[:, i] = (fg_features[:, i] - fg_features[:, i].min()) / \
-                            (fg_features[:, i].max() - fg_features[:, i].min())
-
-    pca_features = np.zeros((patch_tokens.shape[0], 3))
-    pca_features[foreground_mask] = fg_features
+        pca_features[:, i] = (pca_features[:, i] - pca_features[:, i].min()) / \
+                             (pca_features[:, i].max() - pca_features[:, i].min())
 
     pca_features_grid = pca_features.reshape(GRID_SIZE, GRID_SIZE, 3)
     pca_resized = cv2.resize(pca_features_grid, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_CUBIC)
@@ -85,7 +78,7 @@ def main():
     axes[2].axis("off")
 
     plt.tight_layout()
-    plt.savefig("thesis_dinov2_pca_dme2.png", dpi=300, bbox_inches='tight')
+    plt.savefig("thesis_dinov2_pca_dme.png", dpi=300, bbox_inches='tight')
     print("Success! Saved as 'thesis_dinov2_pca_dme.png'.")
     plt.show()
 
