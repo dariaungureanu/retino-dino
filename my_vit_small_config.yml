@@ -1,0 +1,54 @@
+# dinov2/configs/train/vit_small_single_gpu.yaml
+MODEL:
+  WEIGHTS: '' # Leave empty for pre-training from scratch, or add Meta's weights for continuation
+  ARCH: vit_small
+
+train:
+  dataset_path: ImageFolder:../dinov2_dataset/train # Point to our symlink folder
+  output_dir: ../checkpoints_ssl
+  saveckp_freq: 5 # Save intermediate checkpoint every 5 epochs
+  seed: 42
+  batch_size_per_gpu: 32 # VRAM constraint handling
+  epochs: 100 # 40k images is a small dataset; you need more epochs
+  freeze_last_layer_epochs: 1 # Standard DINOv2 stability trick
+
+student:
+  arch: vit_small
+  patch_size: 14
+  drop_path_rate: 0.1
+
+teacher:
+  momentum_teacher: 0.992
+
+optim:
+  epochs: 100
+  weight_decay: 0.04
+  weight_decay_end: 0.4
+  base_lr: 0.0005 # Learning rate scaled down for smaller batch size
+  warmup_epochs: 10
+
+crops:
+  global_crops_scale: [0.32, 1.0]
+  local_crops_number: 6 # Reduced from 8 to fit in 24GB VRAM
+  local_crops_scale: [0.05, 0.32]
+  global_crops_size: 224
+  local_crops_size: 96
+
+evaluation:
+  eval_period_iterations: 1000
+
+# Enable all required losses
+dino:
+  loss_weight: 1.0
+  head_n_prototypes: 65536
+
+ibot:
+  loss_weight: 1.0 # This activates the iBOT loss
+
+koleo:
+  loss_weight: 0.1 # This activates the KoLeo loss
+
+wandb:
+  entity: "ungureanu-li-daria"
+  project: "Licenta-DINOv2-Repo"
+  name: "vit_small_run1"

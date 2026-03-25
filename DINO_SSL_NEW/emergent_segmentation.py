@@ -71,7 +71,7 @@ def main(image_path=None, output_name=None):
 
     fig, axes = plt.subplots(1, 3, figsize=(18, 6))
     axes[0].imshow(img_original)
-    axes[0].set_title("Original OCT (DME)", fontsize=14)
+    axes[0].set_title("Original OCT", fontsize=14)
     axes[0].axis("off")
 
     axes[1].imshow(pca_resized)
