@@ -10,7 +10,7 @@ student:
   arch: vit_small
   patch_size: 14
   drop_path_rate: 0.1
-  pretrained_weights: https://dl.fbaipublicfiles.com/dinov2/dinov2_vits14/dinov2_vits14_pretrain.pth
+  pretrained_weights: ../checkpoints_ssl/dinov2_vits14_pretrain.pth
 
 teacher:
   momentum_teacher: 0.994
