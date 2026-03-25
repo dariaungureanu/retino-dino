@@ -33,14 +33,14 @@ crops:
 dino:
   loss_weight: 1.0
   head_n_prototypes: 65536
+  koleo_loss_weight: 0.1
 
 ibot:
   loss_weight: 1.0
   separate_head: true
   head_n_prototypes: 65536
-
-koleo:
-  loss_weight: 0.1
+  mask_sample_probability: 0.5
+  mask_ratio_min_max: [ 0.1, 0.5 ]
 
 evaluation:
   eval_period_iterations: 1000
