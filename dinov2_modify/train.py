@@ -322,6 +322,30 @@ def main(args):
         print(f"====> LOADING PRETRAINED WEIGHTS FROM: {pretrained_path} <====")
         state_dict = torch.load(pretrained_path, map_location="cpu")
 
+        if 'pos_embed' in state_dict:
+            pos_embed_ckpt = state_dict['pos_embed']
+            pos_embed_model = model.student.backbone.pos_embed
+            if pos_embed_ckpt.shape != pos_embed_model.shape:
+                print(f"====> INTERPOLATING pos_embed from {pos_embed_ckpt.shape} to {pos_embed_model.shape} <====")
+                cls_token = pos_embed_ckpt[:, :1, :]
+                pos_tokens = pos_embed_ckpt[:, 1:, :]
+
+                # Calculam grilele
+                ckpt_size = int(math.sqrt(pos_tokens.shape[1]))
+                model_size = int(math.sqrt(pos_embed_model.shape[1] - 1))
+                dim = pos_tokens.shape[2]
+
+                # Reshape si interpolare bicubica
+                pos_tokens = pos_tokens.reshape(1, ckpt_size, ckpt_size, dim).permute(0, 3, 1, 2)
+                pos_tokens = torch.nn.functional.interpolate(
+                    pos_tokens, size=(model_size, model_size), mode='bicubic', align_corners=False
+                )
+                pos_tokens = pos_tokens.permute(0, 2, 3, 1).flatten(1, 2)
+
+                # Re-asamblare in state_dict
+                state_dict['pos_embed'] = torch.cat((cls_token, pos_tokens), dim=1)
+        # ------------------------------------------
+
         # DINOv2 official checkpoints usually just have the bare backbone weights.
         # We need to map them to model.student.backbone and model.teacher.backbone
         student_msg = model.student.backbone.load_state_dict(state_dict, strict=False)
