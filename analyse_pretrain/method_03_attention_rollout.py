@@ -87,46 +87,32 @@ def load_model(arch, checkpoint, device):
     model.eval().to(device)
     return model
 
-
+@torch.no_grad()
 def attention_rollout(model, x):
-    hooks = []
-    attn_maps = []
+    if hasattr(model, "forward_features"):
+        feats = model.forward_features(x)
+        if isinstance(feats, dict) and "x_norm_patchtokens" in feats and "x_norm_clstoken" in feats:
+            patch = feats["x_norm_patchtokens"]          # [B, N, D]
+            cls = feats["x_norm_clstoken"].unsqueeze(1)  # [B, 1, D]
+            patch = F.normalize(patch, dim=-1)
+            cls = F.normalize(cls, dim=-1)
+            mask = (patch * cls).sum(dim=-1)             # [B, N]
+            return mask
 
-    def hook_fn(_m, _i, o):
-        if isinstance(o, tuple):
-            o = o[1] if len(o) > 1 else o[0]
-        attn_maps.append(o.detach())
+    if hasattr(model, "get_intermediate_layers"):
+        out = model.get_intermediate_layers(
+            x, n=1, return_class_token=True, norm=True
+        )
+        if isinstance(out, list) and len(out) > 0:
+            patch, cls = out[-1]                         # patch:[B,N,D], cls:[B,D]
+            cls = cls.unsqueeze(1)                       # [B,1,D]
+            patch = F.normalize(patch, dim=-1)
+            cls = F.normalize(cls, dim=-1)
+            mask = (patch * cls).sum(dim=-1)             # [B,N]
+            return mask
 
-    for blk in model.blocks:
-        if hasattr(blk.attn, "attn_drop"):
-            hooks.append(blk.attn.attn_drop.register_forward_hook(hook_fn))
+    return None
 
-    with torch.no_grad():
-        _ = model(x)
-
-    for h in hooks:
-        h.remove()
-
-    if len(attn_maps) == 0:
-        return None
-
-    # Fallback for models where hook output is not the attention tensor:
-    if attn_maps[0].dim() != 4:
-        return None
-
-    # attn: [B, H, T, T]
-    attn = [a.mean(dim=1) for a in attn_maps]  # [B, T, T]
-    B, T, _ = attn[0].shape
-    eye = torch.eye(T, device=attn[0].device).unsqueeze(0).expand(B, T, T)
-    joint = eye
-    for a in attn:
-        a = a + eye
-        a = a / a.sum(dim=-1, keepdim=True)
-        joint = torch.bmm(a, joint)
-
-    # cls token -> patch tokens
-    mask = joint[:, 0, 1:]
-    return mask
 
 
 def save_visualization(raw_img_t, mask_1d, out_png, patch_hw, overlay_alpha=0.45):
