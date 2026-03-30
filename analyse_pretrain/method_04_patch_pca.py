@@ -23,11 +23,20 @@ class Sample:
 
 def build_samples(csv_path, image_root, split_col, split_name, path_col, label_col):
     df = pd.read_csv(csv_path)
-    df = df[df[split_col] == split_name].copy()
+    if split_col and split_name:
+        df = df[df[split_col] == split_name].copy()
+
     out = []
     for _, r in df.iterrows():
+        rel = str(r[path_col]).strip()
+
+        # If CSV path is only a filename (e.g., amd_1047099_1.jpg),
+        # build path as image_root/disease/file_name for OCTDL_Cleaned layout.
+        if "/" not in rel and "\\" not in rel and "disease" in df.columns:
+            rel = os.path.join(str(r["disease"]), rel)
+
         out.append(Sample(
-            image_path=os.path.join(image_root, str(r[path_col])),
+            image_path=os.path.join(image_root, rel),
             label=str(r[label_col]),
         ))
     return out

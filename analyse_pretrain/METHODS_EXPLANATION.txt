@@ -67,3 +67,6 @@ Important scientific note:
 - Strongest evidence comes from Method 1 + Method 2.
 - Method 3 and Method 4 are supportive visual analyses.
 - For thesis quality, report quantitative metrics first, then visual evidence.
+
+
+
