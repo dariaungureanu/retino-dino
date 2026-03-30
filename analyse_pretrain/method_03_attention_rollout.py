@@ -23,12 +23,21 @@ class Sample:
 
 def build_samples(csv_path, image_root, split_col, split_name, path_col, label_col):
     df = pd.read_csv(csv_path)
-    df = df[df[split_col] == split_name].copy()
+    if split_col and split_name:
+        df = df[df[split_col] == split_name].copy()
+
     out = []
     for _, r in df.iterrows():
+        rel = str(r[path_col]).strip()
+
+        # If CSV path is only a filename (e.g., amd_1047099_1.jpg),
+        # build path as image_root/disease/file_name for OCTDL_Cleaned layout.
+        if "/" not in rel and "\\" not in rel and "disease" in df.columns:
+            rel = os.path.join(str(r["disease"]), rel)
+
         out.append(Sample(
-            image_path=os.path.join(image_root, str(r[path_col])),
-            label=str(r[label_col])
+            image_path=os.path.join(image_root, rel),
+            label=str(r[label_col]),
         ))
     return out
 
@@ -120,27 +129,51 @@ def attention_rollout(model, x):
     return mask
 
 
-def save_overlay(raw_img_t, mask_1d, out_png, patch_hw):
+def save_visualization(raw_img_t, mask_1d, out_png, patch_hw, overlay_alpha=0.45):
     img = raw_img_t.permute(1, 2, 0).cpu().numpy()
+
     m = mask_1d.reshape(patch_hw, patch_hw)
     m = (m - m.min()) / (m.max() - m.min() + 1e-8)
-    m = np.uint8(255 * m)
-    m = Image.fromarray(m).resize((img.shape[1], img.shape[0]), Image.BILINEAR)
-    m = np.asarray(m) / 255.0
 
-    plt.figure(figsize=(5, 5))
+    # Resize rollout map to image size
+    m_img = Image.fromarray(np.uint8(255 * m)).resize(
+        (img.shape[1], img.shape[0]), Image.BILINEAR
+    )
+    m_resized = np.asarray(m_img).astype(np.float32) / 255.0
+
+    # Heatmap in RGB (jet colormap)
+    heat_rgb = plt.get_cmap("jet")(m_resized)[..., :3]
+
+    alpha = float(np.clip(overlay_alpha, 0.0, 1.0))
+    overlay = (1.0 - alpha) * img + alpha * heat_rgb
+    overlay = np.clip(overlay, 0.0, 1.0)
+
+    plt.figure(figsize=(15, 4))
+    plt.subplot(1, 3, 1)
     plt.imshow(img)
-    plt.imshow(m, alpha=0.45, cmap="jet")
     plt.axis("off")
+    plt.title("Input")
+
+    plt.subplot(1, 3, 2)
+    plt.imshow(heat_rgb)
+    plt.axis("off")
+    plt.title("Attention Rollout Heatmap")
+
+    plt.subplot(1, 3, 3)
+    plt.imshow(overlay)
+    plt.axis("off")
+    plt.title(f"Overlay (alpha={alpha:.2f})")
+
     os.makedirs(os.path.dirname(out_png), exist_ok=True)
     plt.tight_layout()
-    plt.savefig(out_png, dpi=150, bbox_inches="tight", pad_inches=0)
+    plt.savefig(out_png, dpi=150, bbox_inches="tight")
     plt.close()
+
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--arch", default="dinov2_vitb14")
+    ap.add_argument("--arch", default="dinov2_vits14")
     ap.add_argument("--checkpoint", required=True)
     ap.add_argument("--csv", required=True)
     ap.add_argument("--image_root", required=True)
@@ -148,6 +181,7 @@ def main():
     ap.add_argument("--path_col", default="image_path")
     ap.add_argument("--label_col", default="label")
     ap.add_argument("--split", default="test")
+    ap.add_argument("--overlay_alpha", type=float, default=0.45)
     ap.add_argument("--img_size", type=int, default=224)
     ap.add_argument("--batch_size", type=int, default=1)
     ap.add_argument("--num_workers", type=int, default=2)
@@ -180,12 +214,19 @@ def main():
         tokens = mask.shape[-1]
         patch_hw = int(np.sqrt(tokens))
         out_png = os.path.join(args.out_dir, f"rollout_{i:04d}.png")
-        save_overlay(raw[0], mask[0].detach().cpu().numpy(), out_png, patch_hw)
+        save_visualization(
+            raw[0],
+            mask[0].detach().cpu().numpy(),
+            out_png,
+            patch_hw,
+            overlay_alpha=args.overlay_alpha,
+        )
 
         records.append({
             "image_path": p[0],
             "label": y[0],
             "overlay_path": out_png,
+            "overlay_alpha": float(np.clip(args.overlay_alpha, 0.0, 1.0)),
         })
 
     result = {
