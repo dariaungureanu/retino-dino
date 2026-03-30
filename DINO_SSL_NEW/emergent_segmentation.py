@@ -73,7 +73,6 @@ def main(image_path=None, output_name=None):
     axes[0].imshow(img_original)
     axes[0].set_title("Original OCT", fontsize=14)
     axes[0].axis("off")
-
     axes[1].imshow(pca_resized)
     axes[1].set_title("DINOv2 PCA Semantic Features", fontsize=14)
     axes[1].axis("off")

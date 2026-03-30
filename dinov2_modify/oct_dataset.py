@@ -6,8 +6,9 @@ class OCTDataset(ImageFolder):
         self,
         root: str,
         transform: Optional[Callable] = None,
+        target_transform: Optional[Callable] = None,
     ):
-        super().__init__(root, transform=transform)
+        super().__init__(root, transform=transform, target_transform=target_transform)
         print(f"===> OCTDataset Initialized: Found {len(self)} images in {root} <===")
 
     def __getitem__(self, index: int):

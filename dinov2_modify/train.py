@@ -349,7 +349,7 @@ def main(args):
         # DINOv2 official checkpoints usually just have the bare backbone weights.
         # We need to map them to model.student.backbone and model.teacher.backbone
         student_msg = model.student.backbone.load_state_dict(state_dict, strict=False)
-        teacher_msg = model.teacher.backbone.load_state_dict(state_dict, strict=False)
+        teacher_msg = model.teacher.backbone.load _state_dict(state_dict, strict=False)
 
         print(f"Student loading info: {student_msg}")
         print(f"Teacher loading info: {teacher_msg}")
