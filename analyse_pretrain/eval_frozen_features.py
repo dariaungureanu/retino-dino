@@ -13,163 +13,172 @@ from sklearn.metrics import accuracy_score, balanced_accuracy_score, f1_score, c
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from tqdm import tqdm
 import pandas as pd
 
-
 @dataclass
 class Sample:
     image_path: str
-    label: int
+    label: str
 
 
-def build_label_mapping(df: pd.DataFrame, label_col: str) -> Dict[str, int]:
-    classes = sorted(df[label_col].astype(str).unique().tolist())
-    return {c: i for i, c in enumerate(classes)}
+def choose_label_column(df: pd.DataFrame, requested: str) -> str:
+    if requested and requested in df.columns:
+        return requested
+    for c in ["label_disease", "disease", "label_condition_raw", "condition", "label"]:
+        if c in df.columns:
+            return c
+    raise ValueError("No valid label column found. Tried: label_disease, disease, label_condition_raw, condition, label")
 
 
-def apply_label_mapping(df: pd.DataFrame, label_col: str, label_map: Dict[str, int]) -> pd.DataFrame:
-    out = df.copy()
-    out[label_col] = out[label_col].astype(str).map(label_map)
-    out = out.dropna(subset=[label_col])
-    out[label_col] = out[label_col].astype(int)
+def _resolve_rel_path(row: pd.Series, path_col: str) -> str:
+    # Prefer explicit path column; fallback to disease/file_name layout.
+    if path_col and path_col in row.index and pd.notna(row[path_col]):
+        rel = str(row[path_col]).strip()
+        if rel:
+            return rel
+
+    if "file_name" in row.index and pd.notna(row["file_name"]):
+        fname = str(row["file_name"]).strip()
+        if "disease" in row.index and pd.notna(row["disease"]):
+            return os.path.join(str(row["disease"]).strip(), fname)
+        return fname
+
+    raise ValueError("Could not resolve image path. Need path column or file_name column.")
+
+
+def _stratified_split(df: pd.DataFrame, label_col: str, test_size: float, random_state: int) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    # Patient-wise split if possible to avoid leakage.
+    if "patient_id" in df.columns:
+        p = df[["patient_id", label_col]].dropna().copy()
+        if not p.empty:
+            patient_labels = p.groupby("patient_id")[label_col].agg(lambda s: s.astype(str).mode().iloc[0])
+            patient_ids = patient_labels.index.to_numpy()
+            patient_y = patient_labels.astype(str).to_numpy()
+            try:
+                tr_p, te_p = train_test_split(
+                    patient_ids,
+                    test_size=test_size,
+                    random_state=random_state,
+                    stratify=patient_y,
+                )
+                train_df = df[df["patient_id"].isin(tr_p)].copy()
+                test_df = df[df["patient_id"].isin(te_p)].copy()
+                if len(train_df) > 0 and len(test_df) > 0:
+                    return train_df, test_df
+            except Exception:
+                pass
+
+    y = df[label_col].astype(str)
+    try:
+        tr_idx, te_idx = train_test_split(
+            np.arange(len(df)),
+            test_size=test_size,
+            random_state=random_state,
+            stratify=y,
+        )
+    except Exception:
+        tr_idx, te_idx = train_test_split(
+            np.arange(len(df)),
+            test_size=test_size,
+            random_state=random_state,
+            stratify=None,
+        )
+    return df.iloc[tr_idx].copy(), df.iloc[te_idx].copy()
+
+
+def build_samples(csv_path, image_root, split_col, split_name, path_col, label_col, test_size=0.2, random_state=42):
+    df = pd.read_csv(csv_path)
+    label_col = choose_label_column(df, label_col)
+
+    if split_col and split_col in df.columns and split_name:
+        df = df[df[split_col].astype(str) == str(split_name)].copy()
+    elif split_name in {"train", "test"}:
+        train_df, test_df = _stratified_split(df, label_col, test_size=test_size, random_state=random_state)
+        df = train_df if split_name == "train" else test_df
+
+    out = []
+    missing = 0
+    for _, r in df.iterrows():
+        try:
+            rel = _resolve_rel_path(r, path_col)
+            abs_path = os.path.join(image_root, rel)
+            if not os.path.isfile(abs_path):
+                missing += 1
+                continue
+            out.append(Sample(
+                image_path=abs_path,
+                label=str(r[label_col]),
+            ))
+        except Exception:
+            missing += 1
+            continue
+
+    if missing:
+        print(f"[WARN] Skipped {missing} rows due to unresolved/missing image paths.")
     return out
 
 
-def build_samples_from_df(df: pd.DataFrame, image_root: str, path_col: str, label_col: str) -> List[Sample]:
-    samples: List[Sample] = []
-    missing = 0
-    for _, row in df.iterrows():
-        rel_path = str(row[path_col])
-        img_path = rel_path if os.path.isabs(rel_path) else os.path.join(image_root, rel_path)
-        if not os.path.exists(img_path):
-            missing += 1
-            continue
-        samples.append(Sample(image_path=img_path, label=int(row[label_col])))
-    if missing > 0:
-        print(f"[WARN] Skipped {missing} rows with missing image files.")
-    return samples
-
-
-def build_samples_from_csv(
-    csv_path: str,
-    image_root: str,
-    split_col: str,
-    split_name: Optional[str],
-    path_col: str,
-    label_col: str,
-    label_map: Optional[Dict[str, int]] = None,
-) -> Tuple[List[Sample], Dict[str, int]]:
-    df = pd.read_csv(csv_path)
-
-    required = [path_col, label_col]
-    for c in required:
-        if c not in df.columns:
-            raise ValueError(f"Missing required column '{c}' in CSV. Available: {list(df.columns)}")
-
-    if split_name is not None:
-        if split_col not in df.columns:
-            raise ValueError(f"split_col '{split_col}' not found in CSV. Available: {list(df.columns)}")
-        df = df[df[split_col].astype(str) == str(split_name)].copy()
-
-    if label_map is None:
-        if np.issubdtype(df[label_col].dtype, np.number):
-            label_map = {str(int(v)): int(v) for v in sorted(df[label_col].dropna().unique().tolist())}
-            df = df.copy()
-            df[label_col] = df[label_col].astype(int)
-        else:
-            label_map = build_label_mapping(df, label_col)
-            df = apply_label_mapping(df, label_col, label_map)
-    else:
-        if not np.issubdtype(df[label_col].dtype, np.number):
-            df = apply_label_mapping(df, label_col, label_map)
-        else:
-            df = df.copy()
-            df[label_col] = df[label_col].astype(int)
-
-    samples = build_samples_from_df(df, image_root, path_col, label_col)
-    return samples, label_map
-
-
-class OCTLabeledDataset(Dataset):
-    def __init__(self, samples: List[Sample], img_size: int = 224):
+class OCTDataset(Dataset):
+    def __init__(self, samples: List[Sample], img_size=224):
         self.samples = samples
-        self.transform = transforms.Compose([
+        self.t = transforms.Compose([
             transforms.Resize((img_size, img_size)),
             transforms.ToTensor(),
-            # ImageNet normalization for DINOv2 backbones
             transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225]),
+        ])
+        self.raw = transforms.Compose([
+            transforms.Resize((img_size, img_size)),
+            transforms.ToTensor(),
         ])
 
     def __len__(self):
         return len(self.samples)
 
-    def __getitem__(self, idx: int):
-        s = self.samples[idx]
+    def __getitem__(self, i):
+        s = self.samples[i]
         img = Image.open(s.image_path).convert("RGB")
-        x = self.transform(img)
-        y = s.label
-        return x, y
+        return self.t(img), s.label
 
 
-# -----------------------------------------
-# 2) LOAD DINOv2 BACKBONE + CHECKPOINT
-# -----------------------------------------
-def load_dinov2_backbone(arch: str, checkpoint_path: str, device: torch.device):
-    """
-    arch examples:
-      - dinov2_vits14
-      - dinov2_vitb14
-      - dinov2_vitl14
-    """
-    # This uses torch.hub official DINOv2 loading.
+def load_model(arch, checkpoint, device):
     model = torch.hub.load("facebookresearch/dinov2", arch)
-    ckpt = torch.load(checkpoint_path, map_location="cpu")
-
-    # Try common keys used in official training checkpoints
+    ckpt = torch.load(checkpoint, map_location="cpu")
     if isinstance(ckpt, dict):
         if "teacher" in ckpt:
-            state = ckpt["teacher"]
+            st = ckpt["teacher"]
         elif "model" in ckpt:
-            state = ckpt["model"]
+            st = ckpt["model"]
         elif "state_dict" in ckpt:
-            state = ckpt["state_dict"]
+            st = ckpt["state_dict"]
         else:
-            state = ckpt
+            st = ckpt
     else:
-        state = ckpt
+        st = ckpt
 
-    # Remove potential prefixes from DDP wrappers
-    clean_state = {}
-    for k, v in state.items():
-        nk = k
-        if nk.startswith("module."):
-            nk = nk[len("module."):]
-        clean_state[nk] = v
-
-    missing, unexpected = model.load_state_dict(clean_state, strict=False)
-    print(f"[INFO] Loaded checkpoint: {checkpoint_path}")
-    print(f"[INFO] Missing keys: {len(missing)} | Unexpected keys: {len(unexpected)}")
-
+    clean = {}
+    for k, v in st.items():
+        clean[k[7:] if k.startswith("module.") else k] = v
+    model.load_state_dict(clean, strict=False)
     model.eval().to(device)
     return model
-
 
 @torch.no_grad()
 def extract_features(model: nn.Module, loader: DataLoader, device: torch.device) -> Tuple[np.ndarray, np.ndarray]:
     feats = []
     labels = []
-    for x, y in tqdm(loader, desc="Extracting features"):
+    for batch in tqdm(loader, desc="Extracting features"):
+        x, y = batch
         x = x.to(device, non_blocking=True)
-        # DINOv2 forward returns global embedding [B, D]
         f = model(x)
         if isinstance(f, (tuple, list)):
             f = f[0]
         feats.append(f.detach().cpu().numpy())
-        labels.append(y.numpy())
+        labels.append(np.array(y))
     feats = np.concatenate(feats, axis=0)
     labels = np.concatenate(labels, axis=0)
     return feats, labels
@@ -221,9 +230,11 @@ def main():
     parser.add_argument("--image_root", type=str, required=True)
     parser.add_argument("--split_col", type=str, default="split")
     parser.add_argument("--path_col", type=str, default="image_path")
-    parser.add_argument("--label_col", type=str, default="label")
+    parser.add_argument("--label_col", type=str, default="label_disease")
     parser.add_argument("--train_split", type=str, default="train")
     parser.add_argument("--test_split", type=str, default="test")
+    parser.add_argument("--test_size", type=float, default=0.2)
+    parser.add_argument("--random_state", type=int, default=42)
 
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--num_workers", type=int, default=4)
@@ -236,31 +247,21 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[INFO] Device: {device}")
 
-    train_samples, label_map = build_samples_from_csv(
-        args.csv,
-        args.image_root,
-        args.split_col,
-        args.train_split,
-        args.path_col,
-        args.label_col,
-        label_map=None,
+    train_samples = build_samples(
+        args.csv, args.image_root, args.split_col, args.train_split, args.path_col, args.label_col,
+        test_size=args.test_size, random_state=args.random_state
     )
-    test_samples, _ = build_samples_from_csv(
-        args.csv,
-        args.image_root,
-        args.split_col,
-        args.test_split,
-        args.path_col,
-        args.label_col,
-        label_map=label_map,
+    test_samples = build_samples(
+        args.csv, args.image_root, args.split_col, args.test_split, args.path_col, args.label_col,
+        test_size=args.test_size, random_state=args.random_state
     )
     print(f"[INFO] #train={len(train_samples)} #test={len(test_samples)}")
 
     if len(train_samples) == 0 or len(test_samples) == 0:
         raise RuntimeError("Train/test sample list is empty. Check split/path/label columns and values.")
 
-    train_ds = OCTLabeledDataset(train_samples, img_size=args.img_size)
-    test_ds = OCTLabeledDataset(test_samples, img_size=args.img_size)
+    train_ds = OCTDataset(train_samples, img_size=args.img_size)
+    test_ds = OCTDataset(test_samples, img_size=args.img_size)
 
     train_loader = DataLoader(
         train_ds, batch_size=args.batch_size, shuffle=False,
@@ -271,7 +272,7 @@ def main():
         num_workers=args.num_workers, pin_memory=True
     )
 
-    model = load_dinov2_backbone(args.arch, args.checkpoint, device)
+    model = load_model(args.arch, args.checkpoint, device)
 
     x_train, y_train = extract_features(model, train_loader, device)
     x_test, y_test = extract_features(model, test_loader, device)
@@ -284,7 +285,6 @@ def main():
         "arch": args.arch,
         "n_train": int(len(y_train)),
         "n_test": int(len(y_test)),
-        "label_map": label_map,
         "knn": knn_metrics,
         "linear_probe": {
             "acc": lp_metrics["acc"],
