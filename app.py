@@ -20,7 +20,7 @@ except ImportError as e:
     st.error(f"Import error: {e}. Check the CLASSIFIER folder.")
     st.stop()
 
-MODEL_PATH = os.path.join(current_dir, "saved_models", "best_classifier_unfrozen.pth")
+MODEL_PATH = os.path.join(current_dir, "OLD_PRETRAIN/saved_models", "best_classifier_unfrozen.pth")
 # MODEL_PATH = os.path.join(current_dir, "saved_models", "best_classifier.pth")
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 

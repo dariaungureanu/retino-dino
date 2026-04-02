@@ -43,7 +43,7 @@ env/
 *.pt
 *.ckpt
 checkpoints/
-saved_models/
+OLD_PRETRAIN/saved_models/
 
 # Weights & Biases
 wandb/
