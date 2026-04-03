@@ -171,14 +171,28 @@ def load_model(
     print(f"[MODEL] Top-level keys: {list(ckpt.keys())}")
 
     # Step 4 — Extract the right sub-dict
-    # Official DINOv2: {"teacher": {backbone.*, dino_head.*, ibot_head.*}, ...}
-    # We want the teacher (EMA-smoothed, higher quality than student)
-    if "teacher" in ckpt:
-        st = ckpt["teacher"]
-        print(f"[MODEL] Extracted 'teacher' sub-dict ({len(st)} keys)")
-    elif "model" in ckpt:
+    # Official DINOv2 repo saves checkpoints in different formats:
+    #
+    # Format A (FSDP / single-GPU official):
+    #   ckpt = {"model": {"student.backbone.cls_token": ...,
+    #                      "teacher.backbone.cls_token": ...,
+    #                      "dino_loss.center": ..., ...},
+    #           "optimizer": ..., "iteration": ...}
+    #   → All components flat under "model" with full dotted prefixes
+    #
+    # Format B (some custom saves):
+    #   ckpt = {"teacher": {"backbone.cls_token": ..., "dino_head.mlp.0.weight": ...},
+    #           "student": {...}}
+    #   → Teacher/student as separate top-level dicts
+    #
+    # We always want the TEACHER backbone (EMA-smoothed, higher quality).
+
+    if "model" in ckpt:
         st = ckpt["model"]
         print(f"[MODEL] Extracted 'model' sub-dict ({len(st)} keys)")
+    elif "teacher" in ckpt:
+        st = ckpt["teacher"]
+        print(f"[MODEL] Extracted 'teacher' sub-dict ({len(st)} keys)")
     elif "state_dict" in ckpt:
         st = ckpt["state_dict"]
         print(f"[MODEL] Extracted 'state_dict' sub-dict ({len(st)} keys)")
@@ -187,19 +201,51 @@ def load_model(
         print(f"[MODEL] No recognized sub-dict, using top-level")
 
     # Show raw keys for debugging
-    raw_keys = list(st.keys())[:5]
-    print(f"[MODEL] Raw keys (first 5): {raw_keys}")
+    raw_keys = list(st.keys())[:10]
+    print(f"[MODEL] Raw keys (first 10):")
+    for k in raw_keys:
+        print(f"[MODEL]   {k}")
 
-    # Step 5 — Clean key prefixes
-    # "module."   → from DistributedDataParallel wrapping
-    # "backbone." → from SSLMetaArch.teacher.backbone nesting
+    PREFIX_PATTERNS = [
+        "teacher.backbone.",   # Format A: flat model dict (official FSDP save)
+        "backbone.",           # Format B: already inside teacher sub-dict
+        "module.backbone.",    # Format B + DDP wrapping
+        "module.",             # Bare DDP wrapping (no backbone nesting)
+        "",                    # Keys already clean (e.g., manually saved backbone)
+    ]
+
     clean = {}
-    for k, v in st.items():
-        k = k.removeprefix("module.")
-        k = k.removeprefix("backbone.")
-        clean[k] = v
+    matched_prefix = None
 
-    print(f"[MODEL] Cleaned keys (first 5): {list(clean.keys())[:5]}")
+    for prefix in PREFIX_PATTERNS:
+        candidate = {}
+        for k, v in st.items():
+            if k.startswith(prefix) and prefix != "":
+                stripped = k[len(prefix):]
+                candidate[stripped] = v
+            elif prefix == "" and not any(k.startswith(p) for p in ["dino_loss", "ibot_patch_loss"]):
+                candidate[k] = v
+
+        # Check if this prefix gives us keys that match the model
+        if candidate:
+            overlap = set(candidate.keys()) & model_keys
+            if len(overlap) > len(model_keys) * 0.5:
+                clean = candidate
+                matched_prefix = prefix
+                break
+
+    # If no pattern matched well, fall back to teacher.backbone.* with forced extraction
+    if not clean:
+        print(f"[MODEL] No prefix pattern matched cleanly. Trying teacher.backbone.* forcefully...")
+        for k, v in st.items():
+            for prefix in ["teacher.backbone.", "student.backbone.", "backbone.", "module."]:
+                if k.startswith(prefix):
+                    clean[k[len(prefix):]] = v
+                    matched_prefix = prefix
+                    break
+
+    print(f"[MODEL] Matched prefix: '{matched_prefix}'")
+    print(f"[MODEL] Cleaned keys ({len(clean)} total, first 5): {list(clean.keys())[:5]}")
 
     # Step 6 — Load weights and report
     result = model.load_state_dict(clean, strict=False)

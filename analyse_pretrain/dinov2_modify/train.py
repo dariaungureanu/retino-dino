@@ -155,11 +155,12 @@ def do_train(cfg, model, resume=False):
     OFFICIAL_EPOCH_LENGTH = cfg.train.OFFICIAL_EPOCH_LENGTH
     max_iter = cfg.optim.epochs * OFFICIAL_EPOCH_LENGTH
 
+    save_freq = getattr(cfg.train, "save_ckpt_freq", 3)
     periodic_checkpointer = PeriodicCheckpointer(
         checkpointer,
-        period=3 * OFFICIAL_EPOCH_LENGTH,
+        period=save_freq * OFFICIAL_EPOCH_LENGTH,
         max_iter=max_iter,
-        max_to_keep=3,
+        max_to_keep=None,
     )
 
     # setup data preprocessing
@@ -349,7 +350,7 @@ def main(args):
         # DINOv2 official checkpoints usually just have the bare backbone weights.
         # We need to map them to model.student.backbone and model.teacher.backbone
         student_msg = model.student.backbone.load_state_dict(state_dict, strict=False)
-        teacher_msg = model.teacher.backbone.load _state_dict(state_dict, strict=False)
+        teacher_msg = model.teacher.backbone.load_state_dict(state_dict, strict=False)
 
         print(f"Student loading info: {student_msg}")
         print(f"Teacher loading info: {teacher_msg}")

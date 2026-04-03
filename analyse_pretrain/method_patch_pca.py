@@ -17,7 +17,7 @@ Usage:
     # Domain-adapted checkpoint
     python analyse_pretrain/method_patch_pca.py \
         --arch dinov2_vits14 \
-        --checkpoint /home/student/Ungureanu_Daria/antrenare_oct_rezultate/model_final.rank_0.pth \
+        --checkpoint /home/student/Ungureanu_Daria/antrenare_oct_v2/model_final.rank_0.pth \
         --csv /home/student/Ungureanu_Daria/OCTDL_Cleaned/OCTDL_clean_metadata.csv \
         --image_root /home/student/Ungureanu_Daria/OCTDL_Cleaned \
         --split_col label_disease --split AMD \
@@ -39,11 +39,11 @@ Usage:
     for disease in AMD DME ERM NO RVO VID; do
         python analyse_pretrain/method_patch_pca.py \
             --arch dinov2_vits14 \
-            --checkpoint /home/student/Ungureanu_Daria/antrenare_oct_rezultate/model_final.rank_0.pth \
+            --checkpoint /home/student/Ungureanu_Daria/antrenare_oct_v2/model_final.rank_0.pth \
             --csv /home/student/Ungureanu_Daria/OCTDL_Cleaned/OCTDL_clean_metadata.csv \
             --image_root /home/student/Ungureanu_Daria/OCTDL_Cleaned \
             --split_col label_disease --split $disease \
-            --max_images 3 \
+            --max_images 2 \
             --out_dir results/patch_pca/domain_adapted/$disease
     done
 """

@@ -20,7 +20,7 @@ Usage:
     # Domain-adapted checkpoint
     python analyse_pretrain/method_umap.py \
         --arch dinov2_vits14 \
-        --checkpoint /home/student/Ungureanu_Daria/antrenare_oct_rezultate/model_final.rank_0.pth \
+        --checkpoint /home/student/Ungureanu_Daria/antrenare_oct_v2/model_final.rank_0.pth \
         --csv /home/student/Ungureanu_Daria/OCTDL_Cleaned/OCTDL_clean_metadata.csv \
         --image_root /home/student/Ungureanu_Daria/OCTDL_Cleaned \
         --out_dir results/umap/domain_adapted
