@@ -16,6 +16,7 @@ from typing import List, Optional
 import numpy as np
 import pandas as pd
 import torch
+import torch.nn.functional as F
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
@@ -206,6 +207,9 @@ def load_model(
     for k in raw_keys:
         print(f"[MODEL]   {k}")
 
+    # Step 5 — Extract teacher backbone keys and strip prefix
+    # We try multiple known prefix patterns in priority order.
+    # The first pattern that yields matches wins.
     PREFIX_PATTERNS = [
         "teacher.backbone.",   # Format A: flat model dict (official FSDP save)
         "backbone.",           # Format B: already inside teacher sub-dict
@@ -246,6 +250,48 @@ def load_model(
 
     print(f"[MODEL] Matched prefix: '{matched_prefix}'")
     print(f"[MODEL] Cleaned keys ({len(clean)} total, first 5): {list(clean.keys())[:5]}")
+
+    # Step 5b — Interpolate pos_embed if resolution mismatch
+    # Checkpoint was trained at 224px → pos_embed shape [1, 257, 384] (256 patches + CLS)
+    # Hub model may be initialized at 518px → pos_embed shape [1, 1370, 384] (1369 patches + CLS)
+    # We interpolate the checkpoint's pos_embed to match the model's expected resolution.
+    if "pos_embed" in clean and "pos_embed" in model_keys:
+        ckpt_pos = clean["pos_embed"]              # [1, N_ckpt, D]
+        model_pos = model.state_dict()["pos_embed"] # [1, N_model, D]
+
+        if ckpt_pos.shape != model_pos.shape:
+            print(f"[MODEL] pos_embed shape mismatch: checkpoint {list(ckpt_pos.shape)} "
+                  f"vs model {list(model_pos.shape)}")
+
+            # Separate CLS token (position 0) from patch positions
+            cls_token_pos = ckpt_pos[:, :1, :]     # [1, 1, D]
+            patch_pos = ckpt_pos[:, 1:, :]          # [1, N_patches_ckpt, D]
+
+            n_patches_ckpt = patch_pos.shape[1]
+            n_patches_model = model_pos.shape[1] - 1  # subtract CLS
+
+            grid_ckpt = int(n_patches_ckpt ** 0.5)    # e.g., 16 for 224px
+            grid_model = int(n_patches_model ** 0.5)   # e.g., 37 for 518px
+
+            print(f"[MODEL] Interpolating pos_embed: {grid_ckpt}×{grid_ckpt} → "
+                  f"{grid_model}×{grid_model}")
+
+            # Reshape to 2D grid, interpolate, reshape back
+            d = patch_pos.shape[-1]
+            patch_pos = patch_pos.reshape(1, grid_ckpt, grid_ckpt, d).permute(0, 3, 1, 2)
+            patch_pos = F.interpolate(
+                patch_pos.float(),
+                size=(grid_model, grid_model),
+                mode="bicubic",
+                align_corners=False,
+            )
+            patch_pos = patch_pos.permute(0, 2, 3, 1).reshape(1, -1, d)
+
+            # Recombine CLS + interpolated patch positions
+            clean["pos_embed"] = torch.cat([cls_token_pos, patch_pos], dim=1)
+            print(f"[MODEL] pos_embed interpolated: {list(clean['pos_embed'].shape)}")
+        else:
+            print(f"[MODEL] pos_embed shape matches: {list(ckpt_pos.shape)}")
 
     # Step 6 — Load weights and report
     result = model.load_state_dict(clean, strict=False)
