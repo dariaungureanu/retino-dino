@@ -9,7 +9,7 @@ from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-CLASSIFIER_DIR = os.path.join(current_dir, 'CLASSIFIER')
+CLASSIFIER_DIR = os.path.join(current_dir, 'OLD_CLASSIFIER')
 
 if CLASSIFIER_DIR not in sys.path:
     sys.path.insert(0, CLASSIFIER_DIR)
@@ -17,7 +17,7 @@ if CLASSIFIER_DIR not in sys.path:
 try:
     from model import OCTDLMultiTaskModel
 except ImportError as e:
-    st.error(f"Import error: {e}. Check the CLASSIFIER folder.")
+    st.error(f"Import error: {e}. Check the OLD_CLASSIFIER folder.")
     st.stop()
 
 MODEL_PATH = os.path.join(current_dir, "OLD_PRETRAIN/saved_models", "best_classifier_unfrozen.pth")

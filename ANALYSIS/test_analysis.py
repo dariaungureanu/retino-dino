@@ -13,7 +13,7 @@ import sys
 # --- CONFIG ---
 current_script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_script_dir)
-classifier_dir = os.path.join(project_root, 'CLASSIFIER')
+classifier_dir = os.path.join(project_root, 'OLD_CLASSIFIER')
 
 DEFAULT_DATA_PATH = r"C:\Datasets\OCTDL_Cleaned"
 RESULT_DIR = os.path.join(project_root, "results_analysis")

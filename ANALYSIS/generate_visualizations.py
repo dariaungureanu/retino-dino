@@ -19,7 +19,7 @@ project_root = os.path.dirname(current_dir)
 output_dir = os.path.join(current_dir, "visualizations")
 os.makedirs(output_dir, exist_ok=True)
 
-CLASSIFIER_DIR = os.path.join(project_root, "CLASSIFIER")
+CLASSIFIER_DIR = os.path.join(project_root, "OLD_CLASSIFIER")
 
 DATASET_PATH = r"C:\Datasets\OCTDL_Cleaned"
 MODEL_PATH = os.path.join(project_root, "saved_models", "best_classifier_unfrozen.pth")

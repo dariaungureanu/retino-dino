@@ -25,15 +25,7 @@ Usage:
         --img_size 518 --max_images 5 \
         --out_dir results/patch_pca/domain_adapted
 
-    # Baseline (original ImageNet pretrained — no --checkpoint)
-    python analyse_pretrain/method_patch_pca.py \
-        --arch dinov2_vits14 \
-        --csv /home/student/Ungureanu_Daria/OCTDL_Cleaned/OCTDL_clean_metadata.csv \
-        --image_root /home/student/Ungureanu_Daria/OCTDL_Cleaned \
-        --split_col label_disease --split AMD \
-        --path_col file_name --label_col label_disease \
-        --img_size 518 --max_images 5 \
-        --out_dir results/patch_pca/imagenet_baseline
+    # Baseline (original ImageNet pretrained — no
 
     # Run multiple diseases in aloop (adjust paths as needed)
     for disease in AMD DME ERM NO RVO VID; do
