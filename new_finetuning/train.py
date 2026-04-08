@@ -242,7 +242,7 @@ def main():
     print(f"[INFO] Device: {device}")
     if device.type == "cuda":
         print(f"[INFO] GPU: {torch.cuda.get_device_name()}")
-        print(f"[INFO] VRAM: {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB")
+        print(f"[INFO] VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
 
     os.makedirs(args.save_dir, exist_ok=True)
 
