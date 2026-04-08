@@ -4,7 +4,7 @@ Multi-Task Fine-Tuning Pipeline for OCTDL
 DINOv2 ViT-S/14 domain-adapted backbone → dual-head classifier.
 
 Usage:
-    python train.py \
+    python new_finetuning/train.py \
         --data_path /home/student/Ungureanu_Daria/OCTDL_Cleaned \
         --checkpoint /home/student/Ungureanu_Daria/antrenare_oct_v2/model_final.rank_0.pth \
         --save_dir saved_models \
@@ -84,7 +84,7 @@ def compute_metrics(logits, labels, ignore_index=IGNORE_INDEX):
 
 
 def run_epoch(model, loader, criterion_d, criterion_c, device, optimizer=None,
-              scheduler=None, grad_clip=None, epoch=0, phase="train"):
+              scheduler=None, grad_clip=None, epoch=0, phase="train", lambda_cond=1.0):
     """
     Unified train/eval epoch.
     If optimizer is None → evaluation mode (no gradients, no updates).
@@ -109,7 +109,7 @@ def run_epoch(model, loader, criterion_d, criterion_c, device, optimizer=None,
 
             loss_d = criterion_d(logits_d, labels_d)
             loss_c = criterion_c(logits_c, labels_c)
-            loss   = loss_d + LAMBDA_COND * loss_c
+            loss   = loss_d + lambda_cond * loss_c
 
             if is_train:
                 optimizer.zero_grad()
@@ -236,8 +236,6 @@ def main():
     parser.add_argument("--run_name", type=str, default=None)
 
     args = parser.parse_args()
-    global LAMBDA_COND
-    LAMBDA_COND = args.lambda_cond
 
     # ── Setup ──────────────────────────────────────────────────
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -362,12 +360,13 @@ def main():
             model, train_loader, criterion_d, criterion_c, device,
             optimizer=optimizer, scheduler=scheduler,
             grad_clip=args.grad_clip, epoch=epoch, phase="train",
+            lambda_cond=args.lambda_cond,
         )
 
         # Validate
         v_loss, v_met_d, v_met_c = run_epoch(
             model, val_loader, criterion_d, criterion_c, device,
-            epoch=epoch, phase="val",
+            epoch=epoch, phase="val", lambda_cond=args.lambda_cond,
         )
 
         elapsed = time.time() - t0
