@@ -25,7 +25,6 @@ IGNORE_INDEX  = -100
 def get_train_transform(img_size: int = 518):
     return transforms.Compose([
         transforms.Resize((img_size, img_size)),
-        transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD)
     ])
