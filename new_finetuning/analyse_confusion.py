@@ -34,8 +34,6 @@ from dataset import (
 from model import OCTDLMultiTaskModel, load_backbone
 
 
-# ── Model loading ──────────────────────────────────────────────
-
 def load_model_from_checkpoint(model_path, device):
     """
     Load a fine-tuned model from a saved checkpoint.
@@ -67,8 +65,6 @@ def load_model_from_checkpoint(model_path, device):
     return model, ckpt
 
 
-# ── Inference ──────────────────────────────────────────────────
-
 @torch.no_grad()
 def get_predictions(model, loader, device):
     """Run inference and return (preds_disease, labels_disease, preds_condition, labels_condition)."""
@@ -91,8 +87,6 @@ def get_predictions(model, loader, device):
         np.concatenate(all_labels_c),
     )
 
-
-# ── Plotting ───────────────────────────────────────────────────
 
 def plot_confusion_matrix(
     y_true, y_pred, class_names, title, save_path,
@@ -150,8 +144,6 @@ def plot_confusion_matrix(
     plt.close(fig)
     print(f"[SAVED] {save_path}")
 
-
-# ── Main ───────────────────────────────────────────────────────
 
 def main():
     parser = argparse.ArgumentParser(description="Generate confusion matrices")
