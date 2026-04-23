@@ -18,8 +18,8 @@ Usage:
     python finetune_mmrdr/train.py \
         --data_path /home/student/Ungureanu_Daria/MMRDR-OCT \
         --csv /home/student/Ungureanu_Daria/MMRDR-OCT/OCT.csv \
-        --save_dir saved_models/mmrdr_imagenet \
-        --run_name "mmrdr_imagenet"
+        --save_dir saved_models/mmrdr_imagenet_aug \
+        --run_name "mmrdr_imagenet_aug"
 """
 
 import argparse
