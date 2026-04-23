@@ -24,7 +24,9 @@ CLASS_NAMES = {0: "No_DME", 1: "NCI_DME", 2: "CI_DME"}
 
 def get_train_transform(img_size: int = 224):
     return transforms.Compose([
-        transforms.Resize((img_size, img_size)),
+        transforms.RandomResizedCrop(img_size, scale=(0.8, 1.0)),  # mild crop
+        transforms.RandomHorizontalFlip(),
+        transforms.ColorJitter(brightness=0.2, contrast=0.2),  # mild, no hue/sat
         transforms.ToTensor(),
         transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
     ])
