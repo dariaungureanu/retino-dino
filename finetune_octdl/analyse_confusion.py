@@ -3,13 +3,13 @@ Generate confusion matrices from a saved fine-tuning checkpoint.
 
 Usage:
     # Run C (best model)
-    python new_finetuning/analyse_confusion.py \
+    python finetune_octdl/analyse_confusion.py \
         --data_path /home/student/Ungureanu_Daria/OCTDL_Cleaned \
         --checkpoint_dir saved_models/run_C_unfreeze2 \
         --out_dir results/confusion_matrices/run_C
 
     # Any other run
-    python new_finetuning/analyse_confusion.py \
+    python finetune_octdl/analyse_confusion.py \
         --data_path /home/student/Ungureanu_Daria/OCTDL_Cleaned \
         --model_path saved_models/run_A_frozen/best_model.pth \
         --out_dir results/confusion_matrices/run_A

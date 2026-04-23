@@ -7,23 +7,23 @@ Loads any checkpoint from the fine-tuning pipeline and generates:
 
 Usage:
     # Full analysis on Run C
-    python new_finetuning/analyse_explainability.py \
+    python finetune_octdl/analyse_explainability.py \
         --data_path /home/student/Ungureanu_Daria/OCTDL_Cleaned \
         --checkpoint_dir saved_models/run_C_unfreeze2 \
-        --out_dir results/explainability/run_C
+        --out_dir results/explainability/run_finetuning_C
 
     # Only t-SNE
-    python new_finetuning/analyse_explainability.py \
+    python finetune_octdl/analyse_explainability.py \
         --data_path /home/student/Ungureanu_Daria/OCTDL_Cleaned \
         --checkpoint_dir saved_models/run_C_unfreeze2 \
-        --out_dir results/explainability/run_C \
+        --out_dir results/explainability/run_finetuning_C \
         --skip_gradcam
 
     # Only GradCAM for a specific class
-    python new_finetuning/analyse_explainability.py \
+    python finetune_octdl/analyse_explainability.py \
         --data_path /home/student/Ungureanu_Daria/OCTDL_Cleaned \
         --checkpoint_dir saved_models/run_C_unfreeze2 \
-        --out_dir results/explainability/run_C \
+        --out_dir results/explainability/run_finetuning_C \
         --skip_tsne --gradcam_class AMD
 
 """

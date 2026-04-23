@@ -4,7 +4,7 @@ Multi-Task Fine-Tuning Pipeline for OCTDL
 DINOv2 ViT-S/14 domain-adapted backbone → dual-head classifier.
 
 Usage:
-    python new_finetuning/train.py \
+    python finetune_octdl/train.py \
         --data_path /home/student/Ungureanu_Daria/OCTDL_Cleaned \
         --checkpoint /home/student/Ungureanu_Daria/antrenare_oct_v2/model_final.rank_0.pth \
         --save_dir saved_models \

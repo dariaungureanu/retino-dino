@@ -4,20 +4,20 @@ Val and test sets are FIXED across all fractions.
 
 Usage:
     # Domain-adapted backbone
-    python new_finetuning/data_efficiency.py \
+    python finetune_octdl/data_efficiency.py \
         --data_path /home/student/Ungureanu_Daria/OCTDL_Cleaned \
         --checkpoint /home/student/Ungureanu_Daria/antrenare_oct_v2/model_final.rank_0.pth \
         --fractions 0.33 0.66 1.0 \
         --out_dir results/data_efficiency/domain_adapted
 
     # ImageNet baseline (no --checkpoint)
-    python new_finetuning/data_efficiency.py \
+    python finetune_octdl/data_efficiency.py \
         --data_path /home/student/Ungureanu_Daria/OCTDL_Cleaned \
         --fractions 0.33 0.66 1.0 \
         --out_dir results/data_efficiency/imagenet_baseline
 
     # Plot comparison (after running both)
-    python new_finetuning/data_efficiency.py --plot_only \
+    python finetune_octdl/data_efficiency.py --plot_only \
         --results_a results/data_efficiency/domain_adapted/results.json \
         --results_b results/data_efficiency/imagenet_baseline/results.json \
         --label_a "Domain-adapted" --label_b "ImageNet baseline" \
