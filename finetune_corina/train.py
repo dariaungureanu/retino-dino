@@ -8,7 +8,7 @@ Metrics: per-biomarker AUC-ROC, F1, accuracy + macro averages.
 Usage:
 
     # Domain-adapted backbone
-    python finetune_corina/train_corina.py \
+    python finetune_corina/train.py \
         --data_path /home/student/Ungureanu_Daria/corina_dataset \
         --csv /home/student/Ungureanu_Daria/corina_dataset/corina_metadata.csv \
         --checkpoint /home/student/Ungureanu_Daria/antrenare_oct_v2/model_final.rank_0.pth \
@@ -16,7 +16,7 @@ Usage:
         --run_name "corina_domain_adapted"
 
     # ImageNet baseline
-    python finetune_corina/train_corina.py \
+    python finetune_corina/train.py \
         --data_path //home/student/Ungureanu_Daria/corina_dataset \
         --csv /home/student/Ungureanu_Daria/corina_dataset/corina_metadata.csv \
         --save_dir saved_models/corina_imagenet \
