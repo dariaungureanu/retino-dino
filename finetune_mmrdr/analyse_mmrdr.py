@@ -12,7 +12,7 @@ Generates:
 Usage:
     python finetune_mmrdr/analyse_mmrdr.py \
         --data_path /home/student/Ungureanu_Daria/MMRDR-OCT \
-        --csv /home/student/Ungureanu_Daria/MMRDR-OCTOCT.csv \
+        --csv /home/student/Ungureanu_Daria/MMRDR-OCT/OCT.csv \
         --model_path saved_models/mmrdr_domain_adapted_with_aug/best_model.pth \
         --out_dir results/explainability/mmrdr
 """
