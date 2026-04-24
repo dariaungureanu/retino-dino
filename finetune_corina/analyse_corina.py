@@ -1,9 +1,5 @@
 """
 Corina Explainability — t-SNE + GradCAM for multi-label biomarker detection.
-=============================================================================
-Key difference from OCTDL/MMRDR: multi-label means we can show GradCAM
-per BIOMARKER on the SAME image — "where does the model look for DME
-vs where does it look for HF on the same scan?"
 
 Generates:
   1. t-SNE colored by dominant biomarker
@@ -13,8 +9,8 @@ Generates:
 
 Usage:
     python finetune_corina/analyse_corina.py \
-        --data_path /path/to/corina_dataset \
-        --csv /path/to/corina_dataset/corina_metadata.csv \
+        --data_path //home/student/Ungureanu_Daria/corina_dataset \
+        --csv /home/student/Ungureanu_Daria/corina_dataset/corina_metadata.csv \
         --model_path saved_models/corina_domain_adapted/best_model.pth \
         --out_dir results/explainability/corina
 """
@@ -41,9 +37,6 @@ from model import CorinaModel, load_backbone
 THRESHOLD = 0.5
 
 
-# ═══════════════════════════════════════════════════════════════
-#  MODEL LOADING
-# ═══════════════════════════════════════════════════════════════
 
 def load_model(model_path, device):
     print(f"[INFO] Loading: {model_path}")
@@ -64,10 +57,6 @@ def load_model(model_path, device):
     model.eval()
     return model, config
 
-
-# ═══════════════════════════════════════════════════════════════
-#  FEATURE EXTRACTION + T-SNE
-# ═══════════════════════════════════════════════════════════════
 
 @torch.no_grad()
 def extract_features(model, loader, device):
@@ -125,10 +114,6 @@ def plot_tsne(features, labels, out_path, perplexity=30):
     plt.close()
     print(f"[SAVED] {out_path}")
 
-
-# ═══════════════════════════════════════════════════════════════
-#  GRADCAM UTILITIES
-# ═══════════════════════════════════════════════════════════════
 
 class BiomarkerWrapper(nn.Module):
     """Wraps model to output logit for a single biomarker index."""
@@ -278,11 +263,6 @@ def select_samples_multilabel(probs, labels, indices, biomarker_idx=None,
 
     order = np.argsort(-sel_conf)
     return sel[order[:topk]]
-
-
-# ═══════════════════════════════════════════════════════════════
-#  MAIN
-# ═══════════════════════════════════════════════════════════════
 
 def main():
     parser = argparse.ArgumentParser(description="Corina Explainability")
