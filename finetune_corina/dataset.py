@@ -22,9 +22,8 @@ NUM_LABELS = len(BIOMARKERS)
 
 def get_train_transform(img_size: int = 224):
     return transforms.Compose([
-        transforms.RandomResizedCrop(img_size, scale=(0.8, 1.0)),
+        transforms.Resize((img_size, img_size)),
         transforms.RandomHorizontalFlip(),
-        transforms.ColorJitter(brightness=0.2, contrast=0.2),
         transforms.ToTensor(),
         transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
     ])
