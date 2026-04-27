@@ -5,14 +5,19 @@ Same pipeline as Corina but with 9 biomarkers and patient-based splitting.
 Bounding boxes NOT used for training — only image-level labels.
 
 Usage:
-    python finetune_oct5k/build_csv.py --data_path /path/to/oct5k
 
-    python finetune_oct5k/train_oct5k.py \
-        --data_path /path/to/oct5k \
-        --csv /path/to/oct5k/oct5k_metadata.csv \
-        --checkpoint /path/to/model_final.rank_0.pth \
+   python finetune_oct5k/train.py \
+        --data_path /home/student/Ungureanu_Daria/oct5k \
+        --csv /home/student/Ungureanu_Daria/oct5k/oct5k_metadata.csv \
+        --checkpoint /home/student/Ungureanu_Daria/antrenare_oct_v2/model_final.rank_0.pth \
         --save_dir saved_models/oct5k_domain_adapted \
         --run_name "oct5k_domain_adapted"
+
+    python finetune_oct5k/train.py \
+        --data_path /home/student/Ungureanu_Daria/oct5k \
+        --csv /home/student/Ungureanu_Daria/oct5k/oct5k_metadata.csv \
+        --save_dir saved_models/oct5k_imagenet \
+        --run_name "oct5k_imagenet"
 """
 
 import argparse
