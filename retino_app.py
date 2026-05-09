@@ -1,5 +1,5 @@
 """
-Retino-DINO — OCT analysis demo app.
+Retino-DINO - OCT analysis demo app.
 
 DINOv2 ViT-S/14 (domain-adapted on 40k OCT images via SSL) + per-task heads.
 Four fine-tuned checkpoints:
@@ -9,6 +9,14 @@ Four fine-tuned checkpoints:
     OCT5k    multi-label  (8 biomarkers)
 
 Run:  streamlit run retino_app.py
+
+  1. Upload (or pick) an OCT eye-scan image.
+  2. Choose one of 4 fine-tuned models.
+  3. See the model's prediction + a GradCAM heatmap (which pixels mattered).
+  4. Optionally compare the domain-adapted (DA) model vs an ImageNet baseline (IN)
+  model side-by-side.
+  5. Browse pre-generated training/evaluation figures in a "Reports" tab.
+
 """
 import os
 import io
@@ -27,12 +35,9 @@ from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 
-
-# ─────────────────────────────────────────────────────────────────
-# Constants
-# ─────────────────────────────────────────────────────────────────
 ROOT = os.path.dirname(os.path.abspath(__file__))
 CKPT_DIR = os.path.join(ROOT, "checkpoints")
+SAMPLES_DIR = os.path.join(ROOT, "sample_images")
 SSL_BACKBONE = os.path.join(CKPT_DIR, "model_final.rank_0.pth")
 DEVICE = torch.device("cpu")
 ARCH = "dinov2_vits14"
@@ -41,17 +46,13 @@ IMG_MEAN = (0.485, 0.456, 0.406)
 IMG_STD = (0.229, 0.224, 0.225)
 IMG_SIZE = 224
 
-EVAL_TRANSFORM = transforms.Compose([
+EVAL_TRANSFORM = transforms.Compose([ # standard image preprocessing
     transforms.Resize((IMG_SIZE, IMG_SIZE)),
     transforms.ToTensor(),
     transforms.Normalize(IMG_MEAN, IMG_STD),
 ])
 
-
-# ─────────────────────────────────────────────────────────────────
-# Backbone loader (mirrors finetune_*/model.py::load_backbone but
-# always points at the local SSL checkpoint and without train prints)
-# ─────────────────────────────────────────────────────────────────
+# Loading the backbone
 def _build_dinov2():
     return torch.hub.load("facebookresearch/dinov2", ARCH, trust_repo=True)
 
@@ -81,7 +82,7 @@ def load_ssl_backbone(weights_path):
     """Load DINOv2 from hub, then overwrite with SSL teacher weights."""
     model = _build_dinov2()
 
-    if weights_path is None:
+    if weights_path is None: #skip this step -> keep ImageNet weights
         return model
 
     if not os.path.isfile(weights_path):
@@ -126,10 +127,7 @@ def load_ssl_backbone(weights_path):
     return model
 
 
-# ─────────────────────────────────────────────────────────────────
-# Heads & models — mirror finetune_*/model.py (state_dict keys must
-# match the saved checkpoints exactly).
-# ─────────────────────────────────────────────────────────────────
+# Models - heads on top of the backbone
 def _make_head(in_dim, hidden, out_dim, dropout):
     return nn.Sequential(
         nn.Linear(in_dim, hidden),
@@ -140,7 +138,7 @@ def _make_head(in_dim, hidden, out_dim, dropout):
     )
 
 
-class OCTDLModel(nn.Module):
+class OCTDLModel(nn.Module): #multi-task learning
     def __init__(self, backbone, num_diseases, num_conditions,
                  head_hidden=256, head_dropout=0.3):
         super().__init__()
@@ -161,7 +159,7 @@ class OCTDLModel(nn.Module):
         return self.head_disease(f), self.head_condition(f)
 
 
-class SingleHeadModel(nn.Module):
+class SingleHeadModel(nn.Module): #For MMRDR (3 classes), Corina (4 biomarkers), OCT5k (8 biomarkers)
     def __init__(self, backbone, num_outputs, head_hidden=256, head_dropout=0.3):
         super().__init__()
         self.backbone = backbone
@@ -176,9 +174,7 @@ class SingleHeadModel(nn.Module):
         return self.head(f)
 
 
-# ─────────────────────────────────────────────────────────────────
-# GradCAM wrappers
-# ─────────────────────────────────────────────────────────────────
+# GradCAM helpers
 def vit_reshape_transform(tensor):
     """Drop CLS token and reshape (B, 1+N, D) → (B, D, H, W) for ViT."""
     patches = tensor[:, 1:, :]
@@ -198,9 +194,7 @@ class _HeadSelector(nn.Module):
         return self.model(x)[self.head_index]
 
 
-# ─────────────────────────────────────────────────────────────────
-# Task registry
-# ─────────────────────────────────────────────────────────────────
+# The TASKS registry
 OCT5K_LABELS = ["Choroidalfolds", "Geographicatrophy", "Harddrusen",
                 "Hyperfluorescentspots", "PRlayerdisruption",
                 "Reticulardrusen", "Softdrusen", "SoftdrusenPED"]
@@ -221,11 +215,15 @@ TASKS = {
         "type": "octdl",
         "ckpt_da": "octdl_da.pth",
         "ckpt_in": "octdl_in.pth",
+        "samples_subdir": "octdl",
         "disease": OCTDL_DISEASE,
         "condition": OCTDL_CONDITION,
         "gallery_dirs": [
             _path("finetune_octdl", "results", "confusion_matrices", "run_C_unfreeze2"),
             _path("finetune_octdl", "results", "explainability", "run_finetuning_C"),
+            _path("finetune_octdl", "results", "disease_vs_condition"),
+            _path("finetune_octdl", "results", "patient_level"),
+            _path("finetune_octdl", "results", "data_efficiency"),
         ],
     },
     "MMRDR": {
@@ -233,6 +231,7 @@ TASKS = {
         "type": "single",
         "ckpt_da": "mmrdr_da.pth",
         "ckpt_in": "mmrd_in.pth",
+        "samples_subdir": "mmrdr",
         "classes": MMRDR_CLASSES,
         "gallery_dirs": [
             _path("finetune_mmrdr", "results", "confusion_matrices"),
@@ -244,6 +243,7 @@ TASKS = {
         "type": "multilabel",
         "ckpt_da": "corina_da.pth",
         "ckpt_in": "corina_in.pth",
+        "samples_subdir": "corina",
         "biomarkers": CORINA_LABELS,
         "gallery_dirs": [
             _path("finetune_corina", "results"),
@@ -255,6 +255,7 @@ TASKS = {
         "type": "multilabel",
         "ckpt_da": "oct5k_da.pth",
         "ckpt_in": "oct5k_in.pth",
+        "samples_subdir": "oct5k",
         "biomarkers": OCT5K_LABELS,
         "gallery_dirs": [
             _path("finetune_oct5k", "results"),
@@ -263,12 +264,9 @@ TASKS = {
 }
 
 
-# ─────────────────────────────────────────────────────────────────
-# Model loading (cached)
-# ─────────────────────────────────────────────────────────────────
-@st.cache_resource(show_spinner=False)
+# Cached model loading
+@st.cache_resource(show_spinner=False) # the model is only loaded once,
 def get_model(task_key: str, variant: str):
-    """variant ∈ {'da', 'in'}. Returns model in eval mode, on CPU."""
     spec = TASKS[task_key]
     ckpt_name = spec["ckpt_da"] if variant == "da" else spec["ckpt_in"]
     ckpt_path = os.path.join(CKPT_DIR, ckpt_name)
@@ -277,7 +275,7 @@ def get_model(task_key: str, variant: str):
 
     ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
 
-    # Always init backbone with our local SSL weights for DA, hub-default for IN.
+    #Load the SSL backbone or hub ImageNet
     backbone_weights = SSL_BACKBONE if variant == "da" else None
     backbone = load_ssl_backbone(backbone_weights)
 
@@ -288,26 +286,58 @@ def get_model(task_key: str, variant: str):
     elif spec["type"] == "single":
         n = ckpt.get("num_classes", len(spec["classes"]))
         model = SingleHeadModel(backbone, n)
-    else:  # multilabel
+    else:
         n = ckpt.get("num_labels", len(spec["biomarkers"]))
         model = SingleHeadModel(backbone, n)
 
     missing, unexpected = model.load_state_dict(ckpt["model_state_dict"], strict=False)
-    if missing:
-        print(f"[{task_key}/{variant}] missing keys (first 3): {list(missing)[:3]}")
-    if unexpected:
-        print(f"[{task_key}/{variant}] unexpected keys (first 3): {list(unexpected)[:3]}")
+
+    # report if keys dont match (head missing means the checkpoint is not compatible with the model architecture)
+    head_missing = [k for k in missing if "head" in k]
+    backbone_missing = [k for k in missing if "head" not in k]
+    head_unexpected = [k for k in unexpected if "head" in k]
+
+    print(f"\n=== {task_key}/{variant} checkpoint diagnostic ===", file=sys.stderr)
+    print(f"  ckpt top-level keys:   {list(ckpt.keys())}", file=sys.stderr)
+    print(f"  ckpt epoch / best:     "
+          f"{ckpt.get('epoch', '?')} / "
+          f"{ckpt.get('best_val_f1', ckpt.get('best_metric', ckpt.get('val_f1', ckpt.get('val_disease_f1', ckpt.get('val_f1_macro', '?')))))}",
+          file=sys.stderr)
+    print(f"  state-dict size:       {len(ckpt['model_state_dict'])}", file=sys.stderr)
+    print(f"  head_missing:          {head_missing}", file=sys.stderr)
+    print(f"  head_unexpected:       {head_unexpected}", file=sys.stderr)
+    print(f"  backbone_missing(N):   {len(backbone_missing)} "
+          f"(e.g. {backbone_missing[:3]})", file=sys.stderr)
+
+    if hasattr(model, "head_disease"):
+        w = model.head_disease[0].weight
+        print(f"  head_disease[0].weight: "
+              f"mean={w.mean().item():+.4f} std={w.std().item():.4f}",
+              file=sys.stderr)
+    elif hasattr(model, "head"):
+        w = model.head[0].weight
+        print(f"  head[0].weight:         "
+              f"mean={w.mean().item():+.4f} std={w.std().item():.4f}",
+              file=sys.stderr)
+
+    if head_missing or head_unexpected:
+        st.error(
+            f"Head weights did not load cleanly for **{task_key} / {variant}**.\n\n"
+            f"- missing head keys: `{head_missing}`\n"
+            f"- unexpected head keys: `{head_unexpected}`\n\n"
+            f"This usually means the saved state-dict has a different prefix or "
+            f"layer naming. The model below will be partly randomly initialised - "
+            f"predictions are not trustworthy."
+        )
 
     model.to(DEVICE).eval()
-    # GradCAM needs gradients to flow through the target layer.
+
     for p in model.parameters():
         p.requires_grad_(True)
     return model
 
 
-# ─────────────────────────────────────────────────────────────────
 # Inference helpers
-# ─────────────────────────────────────────────────────────────────
 def to_tensor(image: Image.Image) -> torch.Tensor:
     return EVAL_TRANSFORM(image.convert("RGB")).unsqueeze(0).to(DEVICE)
 
@@ -319,6 +349,12 @@ def denormalize(t: torch.Tensor) -> np.ndarray:
 
 
 def predict(model, x, task_type):
+    """
+      Runs the model and converts logits to probabilities:
+      - Softmax for OCTDL/MMRDR (mutually exclusive classes - they sum to 1).
+      - Sigmoid for Corina/OCT5k (independent biomarkers - each one is "yes/no" on its
+      own).
+    """
     with torch.no_grad():
         out = model(x)
     if task_type == "octdl":
@@ -331,7 +367,7 @@ def predict(model, x, task_type):
 
 
 def gradcam(model, x, task_type, target_kind, target_idx):
-    """target_kind: 'disease' | 'condition' (OCTDL) or None."""
+    """Wraps the model in _HeadSelector so GradCAM sees a single output."""
     target_layers = [model.backbone.blocks[-1].norm1]
 
     if task_type == "octdl":
@@ -349,17 +385,36 @@ def gradcam(model, x, task_type, target_kind, target_idx):
     return show_cam_on_image(rgb, heatmap, use_rgb=True)
 
 
-# ─────────────────────────────────────────────────────────────────
 # UI helpers
-# ─────────────────────────────────────────────────────────────────
+_BAR_LEFT   = 0.34
+_BAR_RIGHT  = 0.96
+_BAR_BOTTOM = 0.18
+_BAR_TOP    = 0.86
+_BAR_FIG_W  = 4.8
+_BAR_ROW_H  = 0.38
+_BAR_PAD_H  = 0.95
+
+
+def _truncate(label, n=14):
+    return label if len(label) <= n else label[: n - 1] + "..."
+
+
 def _bar_chart(probs, classes, predicted_idx, title=""):
-    fig, ax = plt.subplots(figsize=(4.5, 0.4 * len(classes) + 0.6))
+    """
+    A horizontal bar chart for single-label outputs (softmax).
+      - All bars are blue, except the predicted one is red
+      - X-axis is locked to 0–100 (probabilities as %).
+      - Each bar has its number labeled to the right
+    """
+    fig, ax = plt.subplots(
+        figsize=(_BAR_FIG_W, _BAR_ROW_H * len(classes) + _BAR_PAD_H)
+    )
     colors = ["#1f77b4"] * len(classes)
     colors[predicted_idx] = "#d62728"
     y = np.arange(len(classes))
     ax.barh(y, probs * 100.0, color=colors, edgecolor="none")
     ax.set_yticks(y)
-    ax.set_yticklabels(classes, fontsize=9)
+    ax.set_yticklabels([_truncate(c) for c in classes], fontsize=9)
     ax.invert_yaxis()
     ax.set_xlim(0, 100)
     ax.set_xlabel("probability (%)", fontsize=9)
@@ -368,18 +423,28 @@ def _bar_chart(probs, classes, predicted_idx, title=""):
     for i, p in enumerate(probs * 100.0):
         ax.text(p + 1.5, i, f"{p:.1f}", va="center", fontsize=8)
     ax.spines[["top", "right"]].set_visible(False)
-    fig.tight_layout()
+    fig.subplots_adjust(left=_BAR_LEFT, right=_BAR_RIGHT,
+                        bottom=_BAR_BOTTOM, top=_BAR_TOP)
     return fig
 
 
 def _multilabel_panel(probs, labels, threshold=0.5, title=""):
-    fig, ax = plt.subplots(figsize=(4.5, 0.4 * len(labels) + 0.6))
+    """
+      For multi-label outputs (sigmoid):
+          - Bars are green if prob ≥ 0.5 (predicted "present"), grey otherwise.
+          - A red dashed vertical line marks the 0.5 decision threshold.
+          - The model can predict any number of biomarkers (zero, one, several).
+    """
+    fig, ax = plt.subplots(
+        figsize=(_BAR_FIG_W, _BAR_ROW_H * len(labels) + _BAR_PAD_H)
+    )
     colors = ["#2ca02c" if p >= threshold else "#9aa0a6" for p in probs]
     y = np.arange(len(labels))
     ax.barh(y, probs * 100.0, color=colors, edgecolor="none")
-    ax.axvline(threshold * 100, color="#d62728", linestyle="--", linewidth=1, alpha=0.7)
+    ax.axvline(threshold * 100, color="#d62728", linestyle="--",
+               linewidth=1, alpha=0.7)
     ax.set_yticks(y)
-    ax.set_yticklabels(labels, fontsize=9)
+    ax.set_yticklabels([_truncate(l) for l in labels], fontsize=9)
     ax.invert_yaxis()
     ax.set_xlim(0, 100)
     ax.set_xlabel("sigmoid probability (%)", fontsize=9)
@@ -388,35 +453,56 @@ def _multilabel_panel(probs, labels, threshold=0.5, title=""):
     for i, p in enumerate(probs * 100.0):
         ax.text(p + 1.5, i, f"{p:.1f}", va="center", fontsize=8)
     ax.spines[["top", "right"]].set_visible(False)
-    fig.tight_layout()
+    fig.subplots_adjust(left=_BAR_LEFT, right=_BAR_RIGHT,
+                        bottom=_BAR_BOTTOM, top=_BAR_TOP)
     return fig
 
 
+def _confidence_caption(container, max_conf, n_classes):
+    # For an in-distribution image, a well-trained K-class model should not sit
+    # near 1/K. Flag suspiciously diffuse softmax outputs.
+    container.caption(f"Top confidence: {max_conf*100:.1f}%")
+    if max_conf < 0.40:
+        container.caption(
+            f"Top confidence only {max_conf*100:.0f}% on a {n_classes}-class "
+            "head - head may be undertrained or input out-of-distribution."
+        )
+
+
 def render_predictions(spec, preds, container, header):
+    """
+      The dispatcher. Reads spec["type"] and renders the right format:
+      - "octdl" - two bar charts (one per head) + two argmax summaries.
+      - "single" - one bar chart + the predicted class.
+      - "multilabel" - the panel + a "Active biomarkers (≥0.5): X, Y" line.
+    """
     container.markdown(f"#### {header}")
     if spec["type"] == "octdl":
         d_idx = int(np.argmax(preds["disease"]))
         c_idx = int(np.argmax(preds["condition"]))
+        d_conf = float(preds["disease"][d_idx])
+        c_conf = float(preds["condition"][c_idx])
         container.markdown(
-            f"**Disease:** `{spec['disease'][d_idx]}` "
-            f"({preds['disease'][d_idx]*100:.1f}%)"
+            f"**Disease:** `{spec['disease'][d_idx]}` ({d_conf*100:.1f}%)"
         )
         container.markdown(
-            f"**Condition:** `{spec['condition'][c_idx]}` "
-            f"({preds['condition'][c_idx]*100:.1f}%)"
+            f"**Condition:** `{spec['condition'][c_idx]}` ({c_conf*100:.1f}%)"
         )
         container.pyplot(_bar_chart(preds["disease"], spec["disease"], d_idx,
                                     "Disease head"), clear_figure=True)
+        _confidence_caption(container, d_conf, len(spec["disease"]))
         container.pyplot(_bar_chart(preds["condition"], spec["condition"], c_idx,
                                     "Condition head"), clear_figure=True)
+        _confidence_caption(container, c_conf, len(spec["condition"]))
     elif spec["type"] == "single":
         idx = int(np.argmax(preds["probs"]))
+        conf = float(preds["probs"][idx])
         container.markdown(
-            f"**Prediction:** `{spec['classes'][idx]}` "
-            f"({preds['probs'][idx]*100:.1f}%)"
+            f"**Prediction:** `{spec['classes'][idx]}` ({conf*100:.1f}%)"
         )
         container.pyplot(_bar_chart(preds["probs"], spec["classes"], idx),
                          clear_figure=True)
+        _confidence_caption(container, conf, len(spec["classes"]))
     else:
         labels = spec["biomarkers"]
         active = [labels[i] for i, p in enumerate(preds["probs"]) if p >= 0.5]
@@ -425,6 +511,75 @@ def render_predictions(spec, preds, container, header):
             + (", ".join(f"`{a}`" for a in active) if active else "_none_")
         )
         container.pyplot(_multilabel_panel(preds["probs"], labels), clear_figure=True)
+
+
+# Sample images
+OCT5K_ABBREV = {
+    "CF":    "Choroidalfolds",
+    "GA":    "Geographicatrophy",
+    "HD":    "Harddrusen",
+    "HFS":   "Hyperfluorescentspots",
+    "PRL":   "PRlayerdisruption",
+    "RD":    "Reticulardrusen",
+    "SD":    "Softdrusen",
+    "SDPED": "SoftdrusenPED",
+}
+
+
+@st.cache_data(show_spinner=False)
+def list_samples(task_key: str):
+    """Return [(display_name, full_path), ...] for the task's sample folder."""
+    spec = TASKS[task_key]
+    sub = spec.get("samples_subdir")
+    if not sub:
+        return []
+    folder = os.path.join(SAMPLES_DIR, sub)
+    if not os.path.isdir(folder):
+        return []
+    out = []
+    for n in sorted(os.listdir(folder)):
+        if n.lower().endswith((".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff")):
+            out.append((n, os.path.join(folder, n)))
+    return out
+
+
+def parse_sample_label(task_key: str, filename: str) -> str:
+    """  Extracts the expected label from the filename so the user can sanity-check
+    predictions."""
+    base = os.path.splitext(filename)[0]
+    parts = base.split("_")
+
+    if task_key == "OCTDL":
+        if parts[0] == "COND" and len(parts) >= 2:
+            cond = parts[1]
+            if cond == "MNV" and len(parts) >= 3 and parts[2] == "suspected":
+                cond = "MNV_suspected"
+            return f"condition · {cond}"
+        return f"disease · {parts[0]}"
+
+    if task_key == "MMRDR":
+        for cls in ("CI_DME", "NCI_DME", "NoDME"):
+            if base.startswith(cls):
+                return cls.replace("NoDME", "No_DME")
+        return "?"
+
+    if task_key == "Corina":
+        present = []
+        for p in parts:
+            if p in CORINA_LABELS:
+                present.append(p)
+            else:
+                break
+        return ", ".join(present) if present else "?"
+
+    if task_key == "OCT5k":
+        prefix = base.split("_", 1)[0]
+        names = []
+        for token in prefix.split("+"):
+            names.append(OCT5K_ABBREV.get(token, token))
+        return ", ".join(names)
+
+    return "?"
 
 
 def gallery_files(spec):
@@ -450,10 +605,9 @@ def gallery_files(spec):
     return out
 
 
-# ─────────────────────────────────────────────────────────────────
-# Streamlit app
-# ─────────────────────────────────────────────────────────────────
+# The main Streamlit UI
 def main():
+    #Page setup
     st.set_page_config(
         page_title="Retino-DINO",
         page_icon=None,
@@ -482,10 +636,11 @@ def main():
         unsafe_allow_html=True,
     )
 
-    # ── Sidebar ────────────────────────────────────────────────
+    #Sidebar
     with st.sidebar:
         st.header("Configuration")
 
+        #Task radio-picks one of the 4 tasks
         task_key = st.radio(
             "Task",
             list(TASKS.keys()),
@@ -493,6 +648,7 @@ def main():
         )
         spec = TASKS[task_key]
 
+        #Compare checkbox,turns on the DA-vs-IN dual view
         compare = st.checkbox(
             "Compare against ImageNet baseline",
             value=False,
@@ -500,12 +656,29 @@ def main():
                  "and show the predictions side by side.",
         )
 
+        #File uploader, accepts standard image formats
         st.divider()
+        st.markdown("**Image source**")
         uploaded = st.file_uploader(
             "Upload an OCT image",
             type=["png", "jpg", "jpeg", "bmp", "tif", "tiff"],
         )
 
+        #Sample dropdown, the "(none)" sentinel keeps the dropdown valid when the user wants to upload instead
+        samples = list_samples(task_key)
+        sample_choice = None
+        if samples:
+            options = ["(none)"] + [n for n, _ in samples]
+            sample_choice = st.selectbox(
+                "Or pick a sample",
+                options,
+                help="Curated examples per task. Filenames encode the expected "
+                     "label so you can sanity-check predictions.",
+            )
+            if sample_choice == "(none)":
+                sample_choice = None
+
+        #footer caption summarizes the architecture.
         st.divider()
         st.caption(
             f"Backbone: `{ARCH}` (384-dim, 12 blocks)  \n"
@@ -515,22 +688,34 @@ def main():
 
     tab_predict, tab_reports = st.tabs(["Predict", "Reports"])
 
-    # ── Predict tab ────────────────────────────────────────────
+    #Predict tab
     with tab_predict:
-        if uploaded is None:
-            st.info("Upload an OCT image from the sidebar to run inference.")
-            _show_task_summary(spec)
-            return
+        image, source_name, expected_label = None, None, None
+        if uploaded is not None:
+            try:
+                image = Image.open(io.BytesIO(uploaded.read())).convert("RGB")
+                source_name = uploaded.name
+            except Exception as e:
+                st.error(f"Could not read uploaded image: {e}")
+                return
+        elif sample_choice is not None:
+            full_path = dict(samples)[sample_choice]
+            try:
+                image = Image.open(full_path).convert("RGB")
+                source_name = sample_choice
+                expected_label = parse_sample_label(task_key, sample_choice)
+            except Exception as e:
+                st.error(f"Could not read sample image: {e}")
+                return
 
-        try:
-            image = Image.open(io.BytesIO(uploaded.read())).convert("RGB")
-        except Exception as e:
-            st.error(f"Could not read image: {e}")
+        if image is None:
+            st.info("Upload an OCT image, or pick a sample from the sidebar.")
+            _show_task_summary(spec)
             return
 
         x = to_tensor(image)
 
-        with st.spinner("Loading domain-adapted model…"):
+        with st.spinner("Loading domain-adapted model..."):
             try:
                 model_da = get_model(task_key, "da")
             except Exception as e:
@@ -539,17 +724,20 @@ def main():
 
         model_in = None
         if compare:
-            with st.spinner("Loading ImageNet baseline…"):
+            with st.spinner("Loading ImageNet baseline..."):
                 try:
                     model_in = get_model(task_key, "in")
                 except Exception as e:
                     st.warning(f"ImageNet checkpoint not available: {e}")
 
-        # GradCAM target picker
+        #GradCAM target picker
         st.markdown("### Inputs")
         c_orig, c_ctrl = st.columns([2, 3])
         with c_orig:
-            st.image(image, caption="Uploaded image", use_container_width=True)
+            cap = source_name or "Uploaded image"
+            st.image(image, caption=cap, use_container_width=True)
+            if expected_label:
+                st.caption(f"Expected (from filename): **{expected_label}**")
 
         with c_ctrl:
             target_kind, target_idx, target_label = _target_picker(spec)
@@ -558,15 +746,15 @@ def main():
                 f"selected output: **{target_label}**."
             )
 
-        # Run predictions + GradCAM
+        #Run predictions + GradCAM
         preds_da = predict(model_da, x, spec["type"])
-        with st.spinner("Computing GradCAM (DA)…"):
+        with st.spinner("Computing GradCAM (DA)..."):
             cam_da = gradcam(model_da, x, spec["type"], target_kind, target_idx)
 
         preds_in = cam_in = None
         if model_in is not None:
             preds_in = predict(model_in, x, spec["type"])
-            with st.spinner("Computing GradCAM (ImageNet)…"):
+            with st.spinner("Computing GradCAM (ImageNet)..."):
                 cam_in = gradcam(model_in, x, spec["type"], target_kind, target_idx)
 
         st.markdown("### Results")
@@ -588,9 +776,9 @@ def main():
                 st.image(cam_in, use_container_width=True)
                 render_predictions(spec, preds_in, st, header="")
 
-    # ── Reports tab ────────────────────────────────────────────
+    #Reports tab
     with tab_reports:
-        st.markdown(f"### Pre-generated reports — {task_key}")
+        st.markdown(f"### Pre-generated reports - {task_key}")
         files = gallery_files(spec)
         if not files:
             st.info("No report images found in the task's results folders yet.")
@@ -633,11 +821,11 @@ def _show_task_summary(spec):
     st.markdown(f"**{spec['label']}**")
     if spec["type"] == "octdl":
         st.markdown(
-            f"- Disease head — {len(spec['disease'])} classes: "
+            f"- Disease head - {len(spec['disease'])} classes: "
             f"{', '.join(spec['disease'])}"
         )
         st.markdown(
-            f"- Condition head — {len(spec['condition'])} classes: "
+            f"- Condition head - {len(spec['condition'])} classes: "
             f"{', '.join(spec['condition'])}"
         )
     elif spec["type"] == "single":
