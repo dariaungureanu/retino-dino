@@ -77,7 +77,7 @@ def extract_features(model, loader, device):
 
 
 def plot_tsne(features, labels, out_path, perplexity=30):
-    print(f"[t-SNE] {len(features)} samples...")
+    print(f"{len(features)} samples...")
     coords = TSNE(n_components=2, random_state=42, perplexity=perplexity).fit_transform(features)
 
     plt.figure(figsize=(10, 8))

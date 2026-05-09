@@ -6,10 +6,10 @@ from pathlib import Path
 def setup_dinov2_dataset(source_dir, dest_dir):
     train_source = os.path.join(source_dir, 'train')
 
-    print(f"scanning strictly inside {train_source} for images...")
+    print(f"scanning {train_source}")
 
     if not os.path.exists(train_source):
-        print(f"ERROR: Could not find {train_source}. Check your paths!")
+        print(f"not found: {train_source}")
         return
 
     extensions = ['*.jpg', '*.jpeg', '*.png', '*.bmp', '*.tif']
@@ -21,7 +21,7 @@ def setup_dinov2_dataset(source_dir, dest_dir):
     dummy_class_dir = os.path.join(dest_dir, 'train', 'all_scans')
     os.makedirs(dummy_class_dir, exist_ok=True)
 
-    print(f"found {len(image_paths)} training images. Creating clean symlinks...")
+    print(f"{len(image_paths)} images, building symlinks")
     for idx, path in enumerate(image_paths):
         ext = Path(path).suffix
         new_filename = f"scan_{idx:06d}{ext}"
@@ -30,7 +30,7 @@ def setup_dinov2_dataset(source_dir, dest_dir):
         if not os.path.exists(dest_path):
             os.symlink(os.path.abspath(path), dest_path)
 
-    print("dataset preparation complete. No test/val data leaked!")
+    print("done")
 
 
 if __name__ == "__main__":

@@ -126,7 +126,7 @@ def plot_tsne(features, labels, label_map, title, save_path,
         print(f"no valid samples for t-SNE: {title}")
         return
 
-    print(f"[t-SNE] Computing projection for {len(features)} samples...")
+    print(f"Computing projection for {len(features)} samples...")
     tsne = TSNE(n_components=2, random_state=random_state, perplexity=perplexity)
     coords = tsne.fit_transform(features)
 

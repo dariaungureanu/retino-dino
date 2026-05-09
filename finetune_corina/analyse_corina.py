@@ -84,7 +84,7 @@ def plot_tsne(features, labels, out_path, perplexity=30):
     combo_to_idx = {c: i for i, c in enumerate(unique_combos)}
     combo_indices = np.array([combo_to_idx[c] for c in combo_names])
 
-    print(f"[t-SNE] {len(features)} samples, {len(unique_combos)} label combinations...")
+    print(f"{len(features)} samples, {len(unique_combos)} label combinations...")
     coords = TSNE(n_components=2, random_state=42, perplexity=perplexity).fit_transform(features)
 
     plt.figure(figsize=(14, 10))
