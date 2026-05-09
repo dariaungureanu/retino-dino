@@ -190,7 +190,6 @@ def evaluate_test(model, loader, criterion, device, biomarkers, out_dir):
         axes[i].set_xlabel("Predicted")
         axes[i].set_ylabel("True")
 
-    # Hide empty subplots
     for j in range(len(biomarkers), len(axes)):
         axes[j].set_visible(False)
 
@@ -244,7 +243,7 @@ def main():
 
     pos_weights = compute_pos_weights(train_df, active_biomarkers).to(device)
 
-    # Filter dataframe columns to only active biomarkers
+    # Filter daatframe columns to only active biomarkers
     train_ds = OCT5kDataset(train_df, args.data_path, get_train_transform(args.img_size), active_biomarkers)
     val_ds = OCT5kDataset(val_df, args.data_path, get_eval_transform(args.img_size), active_biomarkers)
     test_ds = OCT5kDataset(test_df, args.data_path, get_eval_transform(args.img_size), active_biomarkers)

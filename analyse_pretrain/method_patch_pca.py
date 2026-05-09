@@ -56,7 +56,6 @@ from analyse_shared import (
 )
 
 
-# Feature extraction
 
 @torch.no_grad()
 def get_patch_tokens(model: torch.nn.Module, x: torch.Tensor) -> torch.Tensor:
@@ -79,7 +78,6 @@ def get_patch_tokens(model: torch.nn.Module, x: torch.Tensor) -> torch.Tensor:
         )
 
 
-# Visualization
 
 def save_pca_map(
         raw_img_tensor: torch.Tensor,
@@ -100,33 +98,25 @@ def save_pca_map(
         f"Token count {n_patches} != grid {grid_h}x{grid_w}={grid_h * grid_w}"
     )
 
-    # PCA projection
     pca = PCA(n_components=3)
     projected = pca.fit_transform(tokens).reshape(grid_h, grid_w, 3)
-
-    # Normalize to [0, 1]
     projected = (projected - projected.min()) / (projected.max() - projected.min() + 1e-8)
 
-    # Raw image as numpy [H, W, 3]
     raw_np = raw_img_tensor.permute(1, 2, 0).cpu().numpy()
     h, w = raw_np.shape[:2]
 
-    # Upsample PCA map to image resolution
     pca_resized = np.asarray(
         Image.fromarray((projected * 255).astype(np.uint8)).resize(
             (w, h), resample=Image.BILINEAR
         )
     ).astype(np.float32) / 255.0
 
-    # Blend
     alpha = float(np.clip(overlay_alpha, 0.0, 1.0))
     overlay = np.clip((1.0 - alpha) * raw_np + alpha * pca_resized, 0.0, 1.0)
 
-    # Variance string
     evr = pca.explained_variance_ratio_
     var_str = f"var: {evr[0]:.1%}, {evr[1]:.1%}, {evr[2]:.1%}"
 
-    # Plot
     fig, axes = plt.subplots(1, 3, figsize=(15, 4))
 
     axes[0].imshow(raw_np)
@@ -154,7 +144,6 @@ def save_pca_map(
     return evr
 
 
-# Main
 
 def main():
     ap = argparse.ArgumentParser(
@@ -169,7 +158,6 @@ def main():
     device = get_device()
     grid_side = validate_img_size(args.img_size)
 
-    # Data
     samples = build_samples(
         args.csv, args.image_root,
         args.split_col, args.split,
@@ -182,10 +170,8 @@ def main():
     ds = OCTDataset(samples, img_size=args.img_size)
     dl = DataLoader(ds, batch_size=1, shuffle=False, num_workers=2)
 
-    # Model
     model = load_model(args.arch, args.checkpoint, device)
 
-    # Shape check
     with torch.no_grad():
         test_tokens = get_patch_tokens(model, ds[0][0].unsqueeze(0).to(device))
         print(f"patch tokens shape: {test_tokens.shape}  "
@@ -225,7 +211,6 @@ def main():
             "explained_variance": [float(v) for v in evr],
         })
 
-    # Summary
     avg_var = np.mean(all_variance, axis=0)
     print(f"\nprocessed {len(records)} images")
     print("avg explained variance (3 PCA components): "

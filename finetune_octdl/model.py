@@ -93,7 +93,6 @@ def load_backbone(
     print(f"matched prefix: '{matched_prefix}'")
     print(f"cleaned keys: {len(clean)} (first 3: {list(clean.keys())[:3]})")
 
-    # interpolate pos_embed across SSL/fine-tune resolution mismatch
     if "pos_embed" in clean and "pos_embed" in model_keys:
         ckpt_pos  = clean["pos_embed"]
         model_pos = model.state_dict()["pos_embed"]
@@ -102,8 +101,8 @@ def load_backbone(
             print(f"pos_embed mismatch: ckpt {list(ckpt_pos.shape)} "
                   f"vs model {list(model_pos.shape)}")
 
-            cls_pos   = ckpt_pos[:, :1, :]           # [1, 1, D]
-            patch_pos = ckpt_pos[:, 1:, :]            # [1, N_ckpt, D]
+            cls_pos   = ckpt_pos[:, :1, :]
+            patch_pos = ckpt_pos[:, 1:, :]
 
             n_ckpt  = patch_pos.shape[1]
             n_model = model_pos.shape[1] - 1
@@ -205,7 +204,6 @@ class OCTDLMultiTaskModel(nn.Module):
                 if f"blocks.{block_idx}." in name:
                     should_unfreeze = True
                     break
-            # final norm: always train when any block is unfrozen
             if name.startswith("norm."):
                 should_unfreeze = True
 

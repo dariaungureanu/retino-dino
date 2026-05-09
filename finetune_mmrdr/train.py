@@ -54,7 +54,6 @@ from dataset import (
 )
 from model import MMRDRModel, load_backbone
 
-# Defaults match OCTDL Run C.
 ARCH = "dinov2_vits14"
 IMG_SIZE = 224
 BATCH_SIZE = 32
@@ -86,12 +85,10 @@ def compute_all_metrics(logits_or_probs, labels, num_classes):
     macro_f1 = f1_score(labels, preds, average="macro", zero_division=0)
     kappa = cohen_kappa_score(labels, preds)
 
-    # AUC-ROC, one-vs-rest, macro averaged.
     try:
         labels_bin = label_binarize(labels, classes=list(range(num_classes)))
         auc_roc = roc_auc_score(labels_bin, probs, multi_class="ovr", average="macro")
     except ValueError:
-        # Edge case: only one class present in the batch.
         auc_roc = 0.0
 
     return {
@@ -192,7 +189,6 @@ def main():
     parser.add_argument("--save_dir", type=str, default="saved_models/mmrdr")
     parser.add_argument("--run_name", type=str, default=None)
 
-    # Training
     parser.add_argument("--epochs", type=int, default=EPOCHS)
     parser.add_argument("--batch_size", type=int, default=BATCH_SIZE)
     parser.add_argument("--lr_backbone", type=float, default=LR_BACKBONE)
@@ -202,7 +198,6 @@ def main():
     parser.add_argument("--grad_clip", type=float, default=GRAD_CLIP)
     parser.add_argument("--patience", type=int, default=PATIENCE)
 
-    # Architecture
     parser.add_argument("--arch", type=str, default=ARCH)
     parser.add_argument("--img_size", type=int, default=IMG_SIZE)
     parser.add_argument("--unfreeze_last_n", type=int, default=UNFREEZE_LAST_N)

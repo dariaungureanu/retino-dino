@@ -163,7 +163,6 @@ def load_and_split_data(
     return train_paths, train_labels, test_paths, test_labels
 
 
-# Feature extraction
 
 @torch.no_grad()
 def extract_features(
@@ -181,7 +180,6 @@ def extract_features(
     for x, y in tqdm(loader, desc="Extracting features"):
         x = x.to(device, non_blocking=True)
 
-        # Explicitly use forward_features to get the CLS token
         feats = model.forward_features(x)
 
         if isinstance(feats, dict) and "x_norm_clstoken" in feats:
@@ -204,7 +202,6 @@ def extract_features(
     return features, labels
 
 
-# Classifiers
 
 def eval_knn(
     x_train: np.ndarray, y_train: np.ndarray,
@@ -279,20 +276,17 @@ def eval_linear_probe(
     return metrics
 
 
-# Main
 
 def main():
     ap = argparse.ArgumentParser(
         description="Frozen feature evaluation (kNN + Linear Probe) for DINOv2"
     )
 
-    # Model
     ap.add_argument("--arch", default=DEFAULT_ARCH,
                     help="DINOv2 hub architecture")
     ap.add_argument("--checkpoint", default=None,
                     help="Domain-adapted checkpoint. Omit for ImageNet baseline")
 
-    # Data
     ap.add_argument("--csv", required=True, help="Path to metadata CSV")
     ap.add_argument("--image_root", required=True, help="Root image directory")
     ap.add_argument("--label_col", default="label_disease",
@@ -300,26 +294,22 @@ def main():
     ap.add_argument("--path_col", default="file_name",
                     help="CSV column with image filenames")
 
-    # Split
     ap.add_argument("--test_size", type=float, default=0.2,
                     help="Fraction for test set (default: 0.2)")
     ap.add_argument("--random_state", type=int, default=42)
 
-    # Processing
     ap.add_argument("--img_size", type=int, default=224,
                     help="Input resolution (224 is standard for feature extraction)")
     ap.add_argument("--batch_size", type=int, default=32)
     ap.add_argument("--num_workers", type=int, default=4)
     ap.add_argument("--knn_k", type=int, default=20)
 
-    # Output
     ap.add_argument("--out_dir", default="results/frozen_eval")
     ap.add_argument("--out_json", default=None)
     args = ap.parse_args()
 
     device = get_device()
 
-    # Data
     train_paths, train_labels, test_paths, test_labels = load_and_split_data(
         csv_path=args.csv,
         image_root=args.image_root,
@@ -341,18 +331,14 @@ def main():
         num_workers=args.num_workers, pin_memory=True,
     )
 
-    # Model
     model = load_model(args.arch, args.checkpoint, device)
 
-    # Extract
     x_train, y_train = extract_features(model, train_loader, device)
     x_test, y_test = extract_features(model, test_loader, device)
 
-    # Evaluate
     knn_metrics = eval_knn(x_train, y_train, x_test, y_test, k=args.knn_k)
     lp_metrics = eval_linear_probe(x_train, y_train, x_test, y_test)
 
-    # Save
     checkpoint_label = args.checkpoint or "ImageNet baseline (no checkpoint)"
     result = {
         "method": "frozen_feature_evaluation",

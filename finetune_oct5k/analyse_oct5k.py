@@ -252,7 +252,7 @@ def generate_gradcam_with_bbox(
         biomarker_bboxes = bboxes.get(biomarker_name, [])
 
         orig_img = Image.open(os.path.join(dataset.root_dir, row["image"]))
-        ow, oh = orig_img.size  # width, height
+        ow, oh = orig_img.size
 
         iou = compute_heatmap_bbox_iou(cam_map, biomarker_bboxes, ow, oh)
         all_ious.append(iou)

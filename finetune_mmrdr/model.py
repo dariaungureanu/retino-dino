@@ -100,7 +100,7 @@ def load_backbone(arch, checkpoint, device):
 
 class MMRDRModel(nn.Module):
     """Single-task classifier: DINOv2 backbone -> single MLP head -> 3 classes."""
-    EMBED_DIM = 384  # ViT-S/14
+    EMBED_DIM = 384
     NUM_BLOCKS = 12
 
     def __init__(self, backbone, num_classes=3, freeze_backbone=True,

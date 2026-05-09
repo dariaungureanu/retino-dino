@@ -139,11 +139,11 @@ class MultiTaskWrapper(torch.nn.Module):
 
     def forward(self, x):
         outputs = self.model(x)
-        return outputs[self.target_index]  # logits for that head
+        return outputs[self.target_index]
 
 
 def reshape_transform(tensor):
-    result = tensor[:, 1:, :]  # drop CLS
+    result = tensor[:, 1:, :]
     grid_size = int(np.sqrt(result.size(1)))
     result = result.reshape(tensor.size(0), grid_size, grid_size, tensor.size(2))
     result = result.transpose(2, 3).transpose(1, 2)
@@ -169,7 +169,7 @@ def collect_predictions(model, loader, device, task_head=0):
         for images, d_labels, c_labels in tqdm(loader, desc=f"Predict head={task_head}"):
             images = images.to(device)
             outputs = model(images)
-            logits = outputs[task_head]  # [B, num_classes]
+            logits = outputs[task_head]
 
             probs = softmax(logits)
             conf, pred = torch.max(probs, dim=1)

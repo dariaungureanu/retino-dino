@@ -135,7 +135,7 @@ class OCT5kModel(nn.Module):
             features = features["x_norm_clstoken"]
         elif isinstance(features, tuple):
             features = features[0]
-        return self.head(features)  # raw logits, sigmoid applied in loss
+        return self.head(features)
 
     def get_param_groups(self, lr_backbone, lr_heads, weight_decay):
         backbone_params, backbone_nodecay = [], []

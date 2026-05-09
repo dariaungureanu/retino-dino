@@ -43,15 +43,15 @@ from dataset import (
 from model import OCTDLMultiTaskModel, load_backbone
 
 ARCH            = "dinov2_vits14"
-IMG_SIZE        = 224          # match DINOv2 eval resolution
+IMG_SIZE        = 224
 BATCH_SIZE      = 32
 EPOCHS          = 30
-LR_BACKBONE     = 1e-5         # Low LR for domain-adapted backbone
-LR_HEADS        = 5e-4         # Higher LR for randomly-initialized heads
-WEIGHT_DECAY    = 0.05         # Standard for ViT fine-tuning (AdamW)
-WARMUP_EPOCHS   = 3            # Linear warmup before cosine decay
-GRAD_CLIP       = 1.0          # Max gradient norm
-LAMBDA_COND     = 1.0          # Condition loss weight in L_total
+LR_BACKBONE     = 1e-5
+LR_HEADS        = 5e-4
+WEIGHT_DECAY    = 0.05
+WARMUP_EPOCHS   = 3
+GRAD_CLIP       = 1.0
+LAMBDA_COND     = 1.0
 UNFREEZE_LAST_N = 2            # Blocks 10-11 + norm
 HEAD_HIDDEN     = 256
 HEAD_DROPOUT    = 0.3
@@ -123,7 +123,6 @@ def run_epoch(model, loader, criterion_d, criterion_c, device, optimizer=None,
     if is_train and scheduler is not None:
         scheduler.step()
 
-    # Aggregate metrics
     avg_loss   = total_loss / len(loader)
     metrics_d  = compute_metrics(torch.cat(all_logits_d), torch.cat(all_labels_d))
     metrics_c  = compute_metrics(torch.cat(all_logits_c), torch.cat(all_labels_c),
@@ -162,7 +161,6 @@ def evaluate_test(model, loader, criterion_d, criterion_c, device,
     metrics_d = compute_metrics(cat_logits_d, cat_labels_d)
     metrics_c = compute_metrics(cat_logits_c, cat_labels_c, ignore_index=IGNORE_INDEX)
 
-    # Per-class reports
     inv_disease = {v: k for k, v in disease_map.items()}
     inv_condition = {v: k for k, v in condition_map.items()}
 
@@ -196,14 +194,12 @@ def evaluate_test(model, loader, criterion_d, criterion_c, device,
 def main():
     parser = argparse.ArgumentParser(description="OCTDL Multi-Task Fine-Tuning")
 
-    # Paths
     parser.add_argument("--data_path", type=str, required=True,
                         help="Path to OCTDL_Cleaned directory")
     parser.add_argument("--checkpoint", type=str, default=None,
                         help="Domain-adapted checkpoint. None = ImageNet baseline")
     parser.add_argument("--save_dir", type=str, default="saved_models")
 
-    # Training
     parser.add_argument("--epochs", type=int, default=EPOCHS)
     parser.add_argument("--batch_size", type=int, default=BATCH_SIZE)
     parser.add_argument("--lr_backbone", type=float, default=LR_BACKBONE)
@@ -213,7 +209,6 @@ def main():
     parser.add_argument("--grad_clip", type=float, default=GRAD_CLIP)
     parser.add_argument("--patience", type=int, default=PATIENCE)
 
-    # Architecture
     parser.add_argument("--arch", type=str, default=ARCH)
     parser.add_argument("--img_size", type=int, default=IMG_SIZE)
     parser.add_argument("--unfreeze_last_n", type=int, default=UNFREEZE_LAST_N)
@@ -221,14 +216,12 @@ def main():
     parser.add_argument("--head_dropout", type=float, default=HEAD_DROPOUT)
     parser.add_argument("--lambda_cond", type=float, default=LAMBDA_COND)
 
-    # Infrastructure
     parser.add_argument("--num_workers", type=int, default=NUM_WORKERS)
     parser.add_argument("--wandb_project", type=str, default="OCTDL-ViTS14-FineTune")
     parser.add_argument("--run_name", type=str, default=None)
 
     args = parser.parse_args()
 
-    # Setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"device: {device}")
     if device.type == "cuda":
@@ -237,25 +230,20 @@ def main():
 
     os.makedirs(args.save_dir, exist_ok=True)
 
-    # Validate resolution
     if args.img_size % 14 != 0:
         print(f"img_size={args.img_size} not divisible by 14 (patch size)!")
     grid = args.img_size // 14
     print(f"resolution: {args.img_size}x{args.img_size} -> {grid}x{grid} = {grid**2} patches")
 
-    # Data
     csv_path = os.path.join(args.data_path, "OCTDL_clean_metadata.csv")
     train_df, val_df, test_df, disease_map, condition_map = get_data_splits(csv_path)
 
-    # Class weights (computed on training set only)
     weights_d = compute_class_weights(train_df, "label_disease", disease_map).to(device)
     weights_c = compute_class_weights(train_df, "label_condition_raw", condition_map).to(device)
 
-    # Transforms
     train_transform = get_train_transform(args.img_size)
     eval_transform  = get_eval_transform(args.img_size)
 
-    # Datasets & loaders
     train_ds = OCTDLMultiTaskDataset(train_df, args.data_path, train_transform, disease_map, condition_map)
     val_ds   = OCTDLMultiTaskDataset(val_df, args.data_path, eval_transform, disease_map, condition_map)
     test_ds  = OCTDLMultiTaskDataset(test_df, args.data_path, eval_transform, disease_map, condition_map)
@@ -269,7 +257,6 @@ def main():
 
     print(f"batches per epoch: train={len(train_loader)}, val={len(val_loader)}, test={len(test_loader)}")
 
-    # Model
     backbone = load_backbone(args.arch, args.checkpoint, device)
     model = OCTDLMultiTaskModel(
         backbone=backbone,
@@ -281,7 +268,6 @@ def main():
         head_dropout=args.head_dropout,
     ).to(device)
 
-    # Optimizer with differential LR
     param_groups = model.get_param_groups(
         lr_backbone=args.lr_backbone,
         lr_heads=args.lr_heads,
@@ -289,7 +275,6 @@ def main():
     )
     optimizer = optim.AdamW(param_groups)
 
-    # LR scheduler: linear warmup, then cosine decay
     warmup_scheduler = LinearLR(
         optimizer, start_factor=0.01, total_iters=args.warmup_epochs,
     )
@@ -302,11 +287,9 @@ def main():
         milestones=[args.warmup_epochs],
     )
 
-    # Loss functions
     criterion_d = nn.CrossEntropyLoss(weight=weights_d)
     criterion_c = nn.CrossEntropyLoss(weight=weights_c, ignore_index=IGNORE_INDEX)
 
-    # WandB
     run_name = args.run_name or f"{args.arch}_unfreeze{args.unfreeze_last_n}_{args.img_size}px"
     wandb.init(
         project=args.wandb_project,
@@ -334,7 +317,6 @@ def main():
         },
     )
 
-    # Training loop
     best_val_f1 = 0.0
     patience_counter = 0
     best_epoch = 0
@@ -344,7 +326,6 @@ def main():
     for epoch in range(1, args.epochs + 1):
         t0 = time.time()
 
-        # Train
         t_loss, t_met_d, t_met_c = run_epoch(
             model, train_loader, criterion_d, criterion_c, device,
             optimizer=optimizer, scheduler=scheduler,
@@ -352,7 +333,6 @@ def main():
             lambda_cond=args.lambda_cond,
         )
 
-        # Validate
         v_loss, v_met_d, v_met_c = run_epoch(
             model, val_loader, criterion_d, criterion_c, device,
             epoch=epoch, phase="val", lambda_cond=args.lambda_cond,
@@ -360,10 +340,8 @@ def main():
 
         elapsed = time.time() - t0
 
-        # Current LR (from first param group = backbone)
         current_lr = optimizer.param_groups[0]["lr"]
 
-        # Print summary
         print(f"\nepoch {epoch:02d}/{args.epochs} ({elapsed:.0f}s)  lr={current_lr:.2e}")
         print(f"train  loss={t_loss:.4f}  disease_F1={t_met_d['macro_f1']:.4f}  "
               f"cond_F1={t_met_c['macro_f1']:.4f}")
@@ -371,7 +349,6 @@ def main():
               f"cond_F1={v_met_c['macro_f1']:.4f}  "
               f"(best={best_val_f1:.4f})")
 
-        # WandB logging
         wandb.log({
             "epoch": epoch,
             "lr": current_lr,
@@ -391,7 +368,6 @@ def main():
             "val/condition_f1": v_met_c["macro_f1"],
         })
 
-        # Checkpointing on best val disease F1
         if v_met_d["macro_f1"] > best_val_f1:
             best_val_f1 = v_met_d["macro_f1"]
             best_epoch = epoch
@@ -416,7 +392,6 @@ def main():
                       f"Best: epoch {best_epoch}, F1={best_val_f1:.4f}")
                 break
 
-    # Test evaluation on best checkpoint
     print(f"final test (best checkpoint: epoch {best_epoch})")
     best_ckpt = torch.load(
         os.path.join(args.save_dir, "best_model.pth"),

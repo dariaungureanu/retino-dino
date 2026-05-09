@@ -26,7 +26,6 @@ def get_train_transform(img_size: int = 224):
     return transforms.Compose([
         transforms.RandomResizedCrop(img_size, scale=(0.8, 1.0)),
         transforms.RandomHorizontalFlip(),
-        # Brightness/contrast only; no hue/saturation jitter on grayscale OCT.
         transforms.ColorJitter(brightness=0.2, contrast=0.2),
         transforms.ToTensor(),
         transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
@@ -73,7 +72,6 @@ def load_mmrdr_splits(csv_path, root_dir, val_size=0.1, random_state=42):
     df = pd.read_csv(csv_path)
     print(f"loaded {len(df)} rows from {csv_path}")
 
-    # Filename prefix encodes the predefined split.
     df["split"] = df["image"].apply(lambda x: "train" if os.path.basename(x).startswith("tr") else "test")
 
     train_full = df[df["split"] == "train"].copy()

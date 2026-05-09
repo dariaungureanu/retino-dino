@@ -135,11 +135,9 @@ def subsample_train_df(train_df, fraction, random_state=42):
     if fraction >= 1.0:
         return train_df
 
-    # Get unique patients with their majority disease label
     patients = train_df[["patient_id", "label_disease"]].drop_duplicates()
     patient_labels = patients.set_index("patient_id")["label_disease"]
 
-    # Stratified subsample of patients
     selected, _ = train_test_split(
         patient_labels.index.to_numpy(),
         train_size=fraction,
@@ -159,11 +157,9 @@ def train_and_evaluate(
 ):
     """Train a model on the given training subset and evaluate on fixed test set."""
 
-    # Class weights from THIS subset
     weights_d = compute_class_weights(train_df, "label_disease", disease_map).to(device)
     weights_c = compute_class_weights(train_df, "label_condition_raw", condition_map).to(device)
 
-    # Datasets
     train_transform = get_train_transform(IMG_SIZE)
     eval_transform = get_eval_transform(IMG_SIZE)
 
@@ -190,7 +186,6 @@ def train_and_evaluate(
         head_dropout=HEAD_DROPOUT,
     ).to(device)
 
-    # Optimizer
     param_groups = model.get_param_groups(LR_BACKBONE, LR_HEADS, WEIGHT_DECAY)
     optimizer = optim.AdamW(param_groups)
 
@@ -201,12 +196,11 @@ def train_and_evaluate(
     criterion_d = nn.CrossEntropyLoss(weight=weights_d)
     criterion_c = nn.CrossEntropyLoss(weight=weights_c, ignore_index=IGNORE_INDEX)
 
-    # Training loop
     best_val_f1 = 0.0
     best_state = None
     patience_counter = 0
 
-    print(f"\n--- Training with {fraction_label} ({len(train_ds)} images) ---")
+    print(f"\ntraining with {fraction_label} ({len(train_ds)} images)")
 
     for epoch in range(1, EPOCHS + 1):
         t_loss, t_d, t_c = run_epoch(
@@ -235,7 +229,6 @@ def train_and_evaluate(
             print(f"early stop at epoch {epoch}")
             break
 
-    # Evaluate on test with best checkpoint
     model.load_state_dict(best_state)
     model.eval()
 
@@ -267,7 +260,6 @@ def plot_efficiency_curve(results, fractions, out_dir, label=""):
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
 
-    # Disease
     ax1.plot(fractions, f1s, "o-", color="#2196F3", linewidth=2, markersize=8, label="Disease Macro-F1")
     ax1.plot(fractions, cond_f1s, "s--", color="#FF9800", linewidth=2, markersize=8, label="Condition Macro-F1")
     ax1.set_xlabel("Training Data Fraction", fontsize=12)
@@ -279,7 +271,6 @@ def plot_efficiency_curve(results, fractions, out_dir, label=""):
     ax1.grid(True, alpha=0.3)
     ax1.set_ylim([0.5, 1.0])
 
-    # Accuracy
     ax2.plot(fractions, accs, "o-", color="#4CAF50", linewidth=2, markersize=8, label="Disease Accuracy")
     ax2.set_xlabel("Training Data Fraction", fontsize=12)
     ax2.set_ylabel("Accuracy (%)", fontsize=12)
@@ -349,7 +340,6 @@ def main():
     parser.add_argument("--out_dir", type=str, default="results/data_efficiency")
     parser.add_argument("--num_workers", type=int, default=NUM_WORKERS)
 
-    # Plot-only mode
     parser.add_argument("--plot_only", action="store_true")
     parser.add_argument("--results_a", type=str, default=None)
     parser.add_argument("--results_b", type=str, default=None)
@@ -358,7 +348,6 @@ def main():
 
     args = parser.parse_args()
 
-    # Plot-only mode
     if args.plot_only:
         if not args.results_a or not args.results_b:
             raise ValueError("--plot_only requires --results_a and --results_b")
@@ -381,7 +370,6 @@ def main():
 
     checkpoint_label = "domain_adapted" if args.checkpoint else "imagenet_baseline"
 
-    # Run each fraction
     all_results = []
     for frac in args.fractions:
         subset_df = subsample_train_df(train_df, frac)
@@ -394,7 +382,6 @@ def main():
         result["fraction"] = frac
         all_results.append(result)
 
-    # Save results
     output = {
         "checkpoint": args.checkpoint or "ImageNet baseline",
         "fractions": args.fractions,
@@ -405,11 +392,8 @@ def main():
         json.dump(output, f, indent=2)
     print(f"\n{json_path}")
 
-    # Plot
     plot_efficiency_curve(all_results, args.fractions, args.out_dir, label=f"({checkpoint_label})")
 
-    # Summary table
-    print(f"\n{'='*70}")
     print(f"data efficiency summary - {checkpoint_label}")
     print(f"{'Fraction':<10} {'N_train':<10} {'Disease F1':<12} {'Disease Acc':<12} {'Cond F1':<12}")
     for r in all_results:

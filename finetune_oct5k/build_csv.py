@@ -95,23 +95,19 @@ def main():
     if args.out_csv is None:
         args.out_csv = os.path.join(args.data_path, "oct5k_metadata.csv")
 
-    # Load bounding boxes
     bbox_df = pd.read_csv(args.bbox_csv)
     print(f"loaded {len(bbox_df)} bounding boxes from {args.bbox_csv}")
     print(f"unique images: {bbox_df['image'].nunique()}")
 
-    # Build multi-label vectors per image
     rows = []
     missing = 0
 
     for img_rel, group in bbox_df.groupby("image"):
-        # Resolve actual path
         resolved = resolve_image_path(img_rel, args.data_path)
         if resolved is None:
             missing += 1
             continue
 
-        # Binary vector: which biomarkers present in this image
         present_classes = set(group["class"].unique())
         labels = {bm: (1 if bm in present_classes else 0) for bm in BIOMARKERS}
 
@@ -135,7 +131,6 @@ def main():
     print(f"\ntotal images: {len(df)}")
     print(f"unique patients: {df['patient_id'].nunique()}")
 
-    # Biomarker distribution
     print("\nbiomarker distribution:")
     drop_biomarkers = []
     for bm in BIOMARKERS:
@@ -151,13 +146,11 @@ def main():
         print(f"\nbiomarkers with <{args.min_samples} images: {drop_biomarkers}")
         print("these will be kept in CSV but may hurt training.")
 
-    # Patient distribution
     print("\nimages per patient (top 10):")
     pat_counts = df.groupby("patient_id").size().sort_values(ascending=False)
     for pat, n in pat_counts.head(10).items():
         print(f"{pat}: {n} images")
 
-    # Save
     df.to_csv(args.out_csv, index=False)
     print(f"\n{args.out_csv}")
     print(f"columns: {list(df.columns)}")

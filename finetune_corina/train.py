@@ -65,7 +65,7 @@ HEAD_HIDDEN     = 256
 HEAD_DROPOUT    = 0.3
 PATIENCE        = 8
 NUM_WORKERS     = 4
-THRESHOLD       = 0.5  # sigmoid threshold for binary predictions
+THRESHOLD       = 0.5
 
 
 def compute_multilabel_metrics(logits, labels, threshold=THRESHOLD):
@@ -97,7 +97,6 @@ def compute_multilabel_metrics(logits, labels, threshold=THRESHOLD):
         acc_scores.append(acc)
         metrics[f"acc_{bm}"] = acc * 100
 
-        # AUC-ROC needs both classes present in the batch.
         try:
             auc = roc_auc_score(labels[:, i], probs[:, i])
         except ValueError:
@@ -109,7 +108,7 @@ def compute_multilabel_metrics(logits, labels, threshold=THRESHOLD):
     metrics["auc_macro"] = np.mean(auc_scores)
     metrics["acc_macro"] = np.mean(acc_scores) * 100
 
-    # Exact match: all 4 labels correct simultaneously.
+    # Exact match: all 4 labels correct simultaneously
     exact_match = np.all(preds == labels, axis=1).mean() * 100
     metrics["exact_match"] = exact_match
 

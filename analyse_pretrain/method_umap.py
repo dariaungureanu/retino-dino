@@ -47,7 +47,6 @@ from analyse_shared import (
 )
 
 
-# Dataset (same lightweight version as Method 3)
 
 class FeatureExtractionDataset(Dataset):
     def __init__(self, image_paths: List[str], labels: List[str], img_size: int = 224):
@@ -67,7 +66,6 @@ class FeatureExtractionDataset(Dataset):
         return self.transform(img), self.labels[idx]
 
 
-# Data loading
 
 def load_all_samples(
     csv_path: str,
@@ -102,7 +100,6 @@ def load_all_samples(
     if missing > 0:
         print(f"WARNING: {missing} images not found, skipped")
 
-    # Class distribution
     unique, counts = np.unique(labels, return_counts=True)
     print(f"{len(paths)} images, {len(unique)} classes:")
     for cls, cnt in sorted(zip(unique, counts), key=lambda x: -x[1]):
@@ -111,7 +108,6 @@ def load_all_samples(
     return paths, labels
 
 
-# Feature extraction
 
 @torch.no_grad()
 def extract_cls_tokens(
@@ -144,7 +140,6 @@ def extract_cls_tokens(
     return features, labels
 
 
-# UMAP projection + visualization
 
 def run_umap(
     features: np.ndarray,
@@ -195,13 +190,9 @@ def save_umap_plot(
         cmap = plt.get_cmap("tab20")
     class_to_color = {cls: cmap(i / max(n_classes - 1, 1)) for i, cls in enumerate(unique_classes)}
 
-    # Count per class for legend and plotting order
     class_counts = {}
     for cls in unique_classes:
         class_counts[cls] = np.sum(labels == cls)
-
-    # Sort classes: plot majority first (background), minority last (foreground)
-    # This ensures rare classes are visible on top
     plot_order = sorted(unique_classes, key=lambda c: -class_counts[c])
 
     fig, ax = plt.subplots(1, 1, figsize=(10, 8))
@@ -229,7 +220,6 @@ def save_umap_plot(
     ax.set_ylabel("UMAP-2", fontsize=11)
     ax.set_title(title, fontsize=13)
 
-    # Add hyperparameters as subtitle
     ax.text(
         0.02, 0.02,
         f"n_neighbors={n_neighbors}, min_dist={min_dist}, metric=cosine",
@@ -249,30 +239,25 @@ def save_umap_plot(
     print(f"saved plot: {out_path}")
 
 
-# Main
 
 def main():
     ap = argparse.ArgumentParser(
         description="UMAP visualization of DINOv2 CLS tokens by disease class"
     )
 
-    # Model
     ap.add_argument("--arch", default=DEFAULT_ARCH)
     ap.add_argument("--checkpoint", default=None,
                     help="Domain-adapted checkpoint. Omit for ImageNet baseline")
 
-    # Data
     ap.add_argument("--csv", required=True)
     ap.add_argument("--image_root", required=True)
     ap.add_argument("--label_col", default="label_disease")
     ap.add_argument("--path_col", default="file_name")
 
-    # Processing
     ap.add_argument("--img_size", type=int, default=224)
     ap.add_argument("--batch_size", type=int, default=32)
     ap.add_argument("--num_workers", type=int, default=4)
 
-    # UMAP hyperparameters
     ap.add_argument("--n_neighbors", type=int, default=15,
                     help="UMAP n_neighbors (15-30 recommended). "
                          "Higher = more global structure preserved.")
@@ -281,14 +266,12 @@ def main():
                          "Lower = tighter clusters.")
     ap.add_argument("--random_state", type=int, default=42)
 
-    # Output
     ap.add_argument("--out_dir", default="results/umap")
     ap.add_argument("--out_json", default=None)
     args = ap.parse_args()
 
     device = get_device()
 
-    # Data
     paths, labels = load_all_samples(
         args.csv, args.image_root, args.label_col, args.path_col,
     )
@@ -299,13 +282,10 @@ def main():
         num_workers=args.num_workers, pin_memory=True,
     )
 
-    # Model
     model = load_model(args.arch, args.checkpoint, device)
 
-    # Extract
     features, label_array = extract_cls_tokens(model, dl, device)
 
-    # UMAP
     embedding = run_umap(
         features,
         n_neighbors=args.n_neighbors,
@@ -313,7 +293,6 @@ def main():
         random_state=args.random_state,
     )
 
-    # Plot
     checkpoint_name = "Domain-Adapted" if args.checkpoint else "ImageNet Baseline"
     plot_title = f"UMAP - DINOv2 ViT-S/14 CLS Tokens ({checkpoint_name})"
 
@@ -327,7 +306,6 @@ def main():
         min_dist=args.min_dist,
     )
 
-    # Save data for reproducibility
     checkpoint_label = args.checkpoint or "ImageNet baseline (no checkpoint)"
     result = {
         "method": "umap_cls_tokens",
@@ -356,7 +334,6 @@ def main():
         json.dump(result, f, indent=2)
     print(f"JSON log saved: {out_json}")
 
-    # Save raw embeddings (for replotting without re-extracting)
     npz_path = os.path.join(args.out_dir, "umap_data.npz")
     np.savez(
         npz_path,
@@ -365,8 +342,6 @@ def main():
         labels=label_array,
     )
     print(f"raw data saved: {npz_path}")
-    print(f"\n[TIP] To replot without re-extracting features, load {npz_path} directly.")
-
 
 if __name__ == "__main__":
     main()

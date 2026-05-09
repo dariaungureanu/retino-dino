@@ -57,7 +57,6 @@ def denormalize(img_tensor):
     return np.clip(img, 0, 1)
 
 
-# Clinically expected disease -> condition mappings
 DISEASE_CONDITION_MAP = {
     "AMD": ["drusen", "MNV", "MNV_suspected"],
     "DME": ["ME"],
@@ -91,7 +90,6 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     os.makedirs(args.out_dir, exist_ok=True)
 
-    # Load model
     ckpt = torch.load(model_path, map_location=device)
     config = ckpt["config"]
     disease_map = ckpt["disease_map"]
@@ -112,11 +110,9 @@ def main():
     model.load_state_dict(ckpt["model_state_dict"])
     model.eval()
 
-    # Enable gradients for GradCAM
     for p in model.backbone.parameters():
         p.requires_grad_(True)
 
-    # Load test data
     csv_path = os.path.join(args.data_path, "OCTDL_clean_metadata.csv")
     _, _, test_df, _, _ = get_data_splits(csv_path)
     eval_transform = get_eval_transform(config["img_size"])
@@ -151,7 +147,6 @@ def main():
     all_labels_c = np.array(all_labels_c)
     all_conf_d = np.array(all_conf_d)
 
-    # Setup GradCAM for both heads
     target_layers = [model.backbone.blocks[-1].norm1]
 
     wrapper_disease = TaskHeadWrapper(model, 0)
@@ -162,11 +157,9 @@ def main():
     cam_condition = GradCAM(model=wrapper_condition, target_layers=target_layers,
                             reshape_transform=reshape_transform_vit)
 
-    # Generate comparison for each disease class
     for disease_idx in range(len(disease_map)):
         disease_name = inv_disease[disease_idx]
 
-        # Find correct, confident predictions for this disease
         mask = (all_labels_d == disease_idx) & (all_preds_d == disease_idx)
         indices = np.where(mask)[0]
         confs = all_conf_d[indices]
@@ -175,7 +168,6 @@ def main():
             print(f"no correct predictions for {disease_name}")
             continue
 
-        # Top-K most confident
         order = np.argsort(-confs)
         selected = indices[order[:args.topk]]
 
@@ -191,7 +183,6 @@ def main():
             img_input = img_tensor.unsqueeze(0).to(device)
             rgb_img = denormalize(img_input)
 
-            # Get predictions
             with torch.no_grad():
                 logits_d, logits_c = model(img_input)
                 prob_d = softmax(logits_d)[0]
@@ -205,13 +196,11 @@ def main():
             pred_cond_name = inv_condition[pred_c]
             true_cond_name = inv_condition.get(int(label_c), "IGNORE")
 
-            # GradCAM for disease head (target = predicted disease class)
             cam_d = cam_disease(
                 input_tensor=img_input,
                 targets=[ClassifierOutputTarget(pred_d)]
             )[0]
 
-            # GradCAM for condition head (target = predicted condition class)
             cam_c = cam_condition(
                 input_tensor=img_input,
                 targets=[ClassifierOutputTarget(pred_c)]
@@ -220,7 +209,6 @@ def main():
             vis_d = show_cam_on_image(rgb_img, cam_d, use_rgb=True)
             vis_c = show_cam_on_image(rgb_img, cam_c, use_rgb=True)
 
-            # Column 1: Original
             axes[i, 0].imshow(rgb_img)
             axes[i, 0].set_title(
                 f"disease: {pred_disease_name} ({conf_d_val:.0%})\n"
@@ -230,7 +218,6 @@ def main():
             )
             axes[i, 0].axis("off")
 
-            # Column 2: Disease head GradCAM
             axes[i, 1].imshow(vis_d)
             axes[i, 1].set_title(
                 f"disease Head -> {pred_disease_name}",
@@ -238,7 +225,6 @@ def main():
             )
             axes[i, 1].axis("off")
 
-            # Column 3: Condition head GradCAM
             axes[i, 2].imshow(vis_c)
             axes[i, 2].set_title(
                 f"condition Head -> {pred_cond_name}",

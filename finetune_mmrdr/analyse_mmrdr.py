@@ -100,7 +100,7 @@ def plot_tsne(features, labels, out_path, perplexity=30):
 
 def reshape_transform_vit(tensor):
     """ViT output [B, tokens, C] -> [B, C, H, W] for GradCAM."""
-    result = tensor[:, 1:, :]  # drop CLS
+    result = tensor[:, 1:, :]
     grid = int(np.sqrt(result.size(1)))
     result = result.reshape(tensor.size(0), grid, grid, tensor.size(2))
     return result.permute(0, 3, 1, 2)
@@ -248,7 +248,6 @@ def main():
             model, test_loader, device,
         )
 
-        # Per-class CORRECT predictions (implicit localization).
         for grade in range(3):
             correct_samples = select_samples(
                 y_true, y_pred, y_conf, idx,
@@ -261,7 +260,6 @@ def main():
                 title=f"GradCAM - Correct {CLASS_NAMES[grade]} Predictions",
             )
 
-        # Top confident mistakes for error analysis.
         error_samples = select_samples(
             y_true, y_pred, y_conf, idx,
             correct=False, topk=args.topk,
@@ -272,7 +270,6 @@ def main():
             title="GradCAM - Top Confident Errors",
         )
 
-        # nci/ci confusion samples
         nci_as_ci = select_samples(
             y_true, y_pred, y_conf, idx,
             class_idx=1, correct=False, topk=args.topk,
