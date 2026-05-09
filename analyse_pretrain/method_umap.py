@@ -1,20 +1,10 @@
 """
-Method 4 — UMAP of CLS Tokens Colored by Class
-=================================================
-Purpose:
-    Visualize the global structure of the backbone's feature space.
-    Extract one CLS-token embedding per image, project all embeddings
-    to 2D via UMAP, and color each point by its disease class.
+UMAP of CLS tokens, coloured by class.
 
-What this tells you:
-    - Do different diseases form separable clusters in feature space?
-    - Which classes overlap (predicting downstream confusion)?
-    - How does domain adaptation change the feature space structure?
-
-    Tight, well-separated clusters → backbone has learned class-relevant
-    features even without labels (good SSL outcome).
-    Overlapping blobs → backbone hasn't learned to distinguish those classes
-    (expect poor classification for those classes downstream).
+Extracts one CLS-token embedding per image, projects all embeddings to 2D
+via UMAP, and colours each point by its disease label. Tight, separable
+clusters indicate that the backbone has learned class-relevant features
+without supervision; overlapping blobs predict downstream confusion.
 
 Usage:
     # Domain-adapted checkpoint
@@ -25,7 +15,7 @@ Usage:
         --image_root /home/student/Ungureanu_Daria/OCTDL_Cleaned \
         --out_dir results/umap/domain_adapted
 
-    # Baseline (original ImageNet pretrained — no --checkpoint)
+    # Baseline (no --checkpoint -> ImageNet weights)
     python analyse_pretrain/method_umap.py \
         --arch dinov2_vits14 \
         --csv /home/student/Ungureanu_Daria/OCTDL_Cleaned/OCTDL_clean_metadata.csv \
@@ -57,9 +47,7 @@ from analyse_shared import (
 )
 
 
-# ──────────────────────────────────────────────────────────────
 # Dataset (same lightweight version as Method 3)
-# ──────────────────────────────────────────────────────────────
 
 class FeatureExtractionDataset(Dataset):
     def __init__(self, image_paths: List[str], labels: List[str], img_size: int = 224):
@@ -79,9 +67,7 @@ class FeatureExtractionDataset(Dataset):
         return self.transform(img), self.labels[idx]
 
 
-# ──────────────────────────────────────────────────────────────
 # Data loading
-# ──────────────────────────────────────────────────────────────
 
 def load_all_samples(
     csv_path: str,
@@ -89,10 +75,7 @@ def load_all_samples(
     label_col: str,
     path_col: str,
 ) -> Tuple[List[str], List[str]]:
-    """
-    Load ALL images from CSV (no train/test split needed —
-    UMAP uses every available sample for the best visualization).
-    """
+    """Load every image listed in the CSV (UMAP uses all samples)."""
     import pandas as pd
 
     df = pd.read_csv(csv_path)
@@ -129,9 +112,7 @@ def load_all_samples(
     return paths, labels
 
 
-# ──────────────────────────────────────────────────────────────
 # Feature extraction
-# ──────────────────────────────────────────────────────────────
 
 @torch.no_grad()
 def extract_cls_tokens(
@@ -164,9 +145,7 @@ def extract_cls_tokens(
     return features, labels
 
 
-# ──────────────────────────────────────────────────────────────
 # UMAP projection + visualization
-# ──────────────────────────────────────────────────────────────
 
 def run_umap(
     features: np.ndarray,
@@ -184,7 +163,7 @@ def run_umap(
 
     print(f"[UMAP] Running UMAP (n_neighbors={n_neighbors}, min_dist={min_dist})...")
 
-    # StandardScaler before UMAP — important for stable projections
+    # StandardScaler before UMAP keeps the projection stable across runs.
     scaler = StandardScaler()
     features_scaled = scaler.fit_transform(features)
 
@@ -216,7 +195,7 @@ def save_umap_plot(
     unique_classes = sorted(set(labels))
     n_classes = len(unique_classes)
 
-    # Color map — use a qualitative palette that works for up to ~10 classes
+    # tab10 covers up to 10 classes cleanly; tab20 for more.
     if n_classes <= 10:
         cmap = plt.get_cmap("tab10")
     else:
@@ -277,9 +256,7 @@ def save_umap_plot(
     print(f"[INFO] Saved plot: {out_path}")
 
 
-# ──────────────────────────────────────────────────────────────
 # Main
-# ──────────────────────────────────────────────────────────────
 
 def main():
     ap = argparse.ArgumentParser(
@@ -318,7 +295,7 @@ def main():
 
     device = get_device()
 
-    # ── Data ──
+    # Data
     paths, labels = load_all_samples(
         args.csv, args.image_root, args.label_col, args.path_col,
     )
@@ -329,13 +306,13 @@ def main():
         num_workers=args.num_workers, pin_memory=True,
     )
 
-    # ── Model ──
+    # Model
     model = load_model(args.arch, args.checkpoint, device)
 
-    # ── Extract ──
+    # Extract
     features, label_array = extract_cls_tokens(model, dl, device)
 
-    # ── UMAP ──
+    # UMAP
     embedding = run_umap(
         features,
         n_neighbors=args.n_neighbors,
@@ -343,9 +320,9 @@ def main():
         random_state=args.random_state,
     )
 
-    # ── Plot ──
+    # Plot
     checkpoint_name = "Domain-Adapted" if args.checkpoint else "ImageNet Baseline"
-    plot_title = f"UMAP — DINOv2 ViT-S/14 CLS Tokens ({checkpoint_name})"
+    plot_title = f"UMAP - DINOv2 ViT-S/14 CLS Tokens ({checkpoint_name})"
 
     plot_path = os.path.join(args.out_dir, "umap_by_class.png")
     save_umap_plot(
@@ -357,7 +334,7 @@ def main():
         min_dist=args.min_dist,
     )
 
-    # ── Save data for reproducibility ──
+    # Save data for reproducibility
     checkpoint_label = args.checkpoint or "ImageNet baseline (no checkpoint)"
     result = {
         "method": "umap_cls_tokens",
@@ -386,7 +363,7 @@ def main():
         json.dump(result, f, indent=2)
     print(f"[INFO] JSON log saved: {out_json}")
 
-    # ── Save raw embeddings (for replotting without re-extracting) ──
+    # Save raw embeddings (for replotting without re-extracting)
     npz_path = os.path.join(args.out_dir, "umap_data.npz")
     np.savez(
         npz_path,

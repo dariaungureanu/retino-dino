@@ -1,12 +1,7 @@
 """
-Groups per-image predictions by patient_id, computes patient-level
-metrics via majority voting.
-
-For each patient:
-  1. Collect all image predictions
-  2. Majority vote → patient-level prediction
-  3. Compare against patient's true label
-  4. Compute precision/recall/F1 at patient level
+Group per-image predictions by patient_id and compute patient-level metrics
+via majority voting (collect images, majority vote -> patient prediction,
+score against the patient's true label).
 
 Usage:
     python finetune_octdl/analyse_patient_level.py \
@@ -92,7 +87,7 @@ def main():
     test_loader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False,
                              num_workers=args.num_workers, pin_memory=True)
 
-    # ── Per-image predictions ──────────────────────────────────
+    # Per-image predictions
     softmax = nn.Softmax(dim=1)
     all_preds_d, all_preds_c, all_probs_d = [], [], []
 
@@ -112,7 +107,6 @@ def main():
     all_preds_c = np.array(all_preds_c)
     all_probs_d = np.array(all_probs_d)
 
-    # Add predictions to test dataframe
     test_df_reset = test_df.reset_index(drop=True)
     test_df_reset["pred_disease"] = all_preds_d
     test_df_reset["pred_condition"] = all_preds_c
@@ -121,7 +115,7 @@ def main():
         lambda x: condition_map.get(x, IGNORE_INDEX)
     )
 
-    # ── Image-level metrics (for comparison) ───────────────────
+    # Image-level metrics (for comparison)
     print(f"\n{'='*60}")
     print(f"  IMAGE-LEVEL METRICS (for reference)")
     print(f"{'='*60}")
@@ -144,29 +138,23 @@ def main():
         )
         print(f"  Condition: Acc={img_c_acc*100:.1f}%  Macro-F1={img_c_f1:.4f}")
 
-    # ── Patient-level aggregation ──────────────────────────────
     print(f"\n{'='*60}")
     print(f"  PATIENT-LEVEL METRICS (majority vote)")
     print(f"{'='*60}")
 
-    # Group by patient, majority vote for disease
     patient_results = []
     for patient_id, group in test_df_reset.groupby("patient_id"):
-        # True disease (should be same for all scans of a patient)
         true_disease = group["true_disease"].mode().iloc[0]
         true_disease_name = inv_disease[true_disease]
 
-        # Majority vote on predictions
         pred_counts = Counter(group["pred_disease"])
         pred_disease = pred_counts.most_common(1)[0][0]
         pred_disease_name = inv_disease[pred_disease]
 
-        # Alternative: average probabilities then argmax (smoother)
         avg_probs = all_probs_d[group.index].mean(axis=0)
         pred_disease_avg = np.argmax(avg_probs)
         pred_disease_avg_name = inv_disease[pred_disease_avg]
 
-        # Condition — majority vote (ignore IGNORE_INDEX)
         valid_conds = group[group["true_condition"] != IGNORE_INDEX]
         true_condition = valid_conds["true_condition"].mode().iloc[0] if len(valid_conds) > 0 else IGNORE_INDEX
         pred_cond_counts = Counter(all_preds_c[valid_conds.index]) if len(valid_conds) > 0 else Counter()
@@ -191,7 +179,7 @@ def main():
 
     pat_df = pd.DataFrame(patient_results)
 
-    # ── Disease — Patient Level ────────────────────────────────
+    # Disease, patient-level
     print(f"\n  Patients in test set: {len(pat_df)}")
     print(f"\n  --- Disease (Majority Vote) ---")
 
@@ -200,7 +188,6 @@ def main():
     pat_pred_d_vote = pat_df["pred_disease_vote"].values
     pat_pred_d_avg = pat_df["pred_disease_avg"].values
 
-    # Majority vote metrics
     pat_d_acc_vote = accuracy_score(pat_true_d, pat_pred_d_vote) * 100
     pat_d_bal_vote = balanced_accuracy_score(pat_true_d, pat_pred_d_vote) * 100
     pat_d_f1_vote = f1_score(pat_true_d, pat_pred_d_vote, average="macro", zero_division=0)
@@ -212,13 +199,12 @@ def main():
         target_names=disease_names, zero_division=0,
     ))
 
-    # Average probability metrics
     pat_d_acc_avg = accuracy_score(pat_true_d, pat_pred_d_avg) * 100
     pat_d_f1_avg = f1_score(pat_true_d, pat_pred_d_avg, average="macro", zero_division=0)
     print(f"  --- Disease (Average Probabilities) ---")
     print(f"  Acc={pat_d_acc_avg:.1f}%  Macro-F1={pat_d_f1_avg:.4f}")
 
-    # ── Condition — Patient Level ──────────────────────────────
+    # Condition, patient-level
     valid_pat = pat_df[pat_df["true_condition"] != IGNORE_INDEX]
     if len(valid_pat) > 0:
         print(f"\n  --- Condition (Majority Vote) ---")
@@ -233,7 +219,7 @@ def main():
             target_names=condition_names, zero_division=0,
         ))
 
-    # ── Per-patient scan accuracy ──────────────────────────────
+    # Per-patient scan accuracy
     print(f"\n  --- Per-Patient Scan Accuracy ---")
     print(f"  (What fraction of each patient's scans were correctly classified?)")
     for _, row in pat_df.sort_values("scan_accuracy").iterrows():
@@ -242,7 +228,7 @@ def main():
               f"{row['scan_accuracy']:.0%} ({row['n_scans']} scans) "
               f"True={row['true_disease_name']:>4} Pred={row['pred_disease_vote_name']:>4}")
 
-    # ── Confusion matrix at patient level ──────────────────────
+    # Patient-level confusion matrix
     cm = confusion_matrix(pat_true_d, pat_pred_d_vote)
     fig, ax = plt.subplots(figsize=(10, 8))
     sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
@@ -256,7 +242,7 @@ def main():
     plt.close(fig)
     print(f"\n[SAVED] {cm_path}")
 
-    # ── Summary comparison ─────────────────────────────────────
+    # Summary comparison
     print(f"\n{'='*60}")
     print(f"  IMAGE-LEVEL vs PATIENT-LEVEL COMPARISON")
     print(f"{'='*60}")

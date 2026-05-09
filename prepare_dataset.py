@@ -4,7 +4,6 @@ from pathlib import Path
 
 
 def setup_dinov2_dataset(source_dir, dest_dir):
-    # CRITICAL FIX: We ONLY scan the 'train' folder to prevent data leakage!
     train_source = os.path.join(source_dir, 'train')
 
     print(f"Scanning strictly inside {train_source} for images...")
@@ -19,7 +18,6 @@ def setup_dinov2_dataset(source_dir, dest_dir):
         image_paths.extend(glob.glob(os.path.join(train_source, '**', ext), recursive=True))
         image_paths.extend(glob.glob(os.path.join(train_source, '**', ext.upper()), recursive=True))
 
-    # DINOv2 expects a dummy class folder inside 'train'
     dummy_class_dir = os.path.join(dest_dir, 'train', 'all_scans')
     os.makedirs(dummy_class_dir, exist_ok=True)
 
@@ -36,7 +34,6 @@ def setup_dinov2_dataset(source_dir, dest_dir):
 
 
 if __name__ == "__main__":
-    # Pointing to the specific 'combined' folder that contains your train/val/test
     SOURCE_DIR = "../combined/combined"
     DEST_DIR = "../dinov2_dataset"
     setup_dinov2_dataset(SOURCE_DIR, DEST_DIR)

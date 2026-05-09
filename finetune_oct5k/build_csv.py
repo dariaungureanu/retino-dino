@@ -1,10 +1,10 @@
 """
 Build CSV from OCT5k bounding box annotations.
-=================================================
-Converts bounding boxes → multi-label binary vectors (per image).
-Resolves images across Images_Automatic/ and Images_Manual/.
-Extracts patient/volume IDs for patient-based splitting.
-Saves bounding boxes separately for GradCAM validation later.
+
+Converts bounding boxes to multi-label binary vectors per image, resolves
+images across Images_Automatic/ and Images_Manual/, extracts patient/volume
+IDs for patient-based splitting, and saves bounding boxes separately for
+GradCAM validation later.
 
 Usage:
     python finetune_oct5k/build_csv.py \
@@ -51,16 +51,16 @@ def resolve_image_path(relative_path, data_path):
 
 
 def extract_patient_id(image_path):
-    """
-    Extract patient/volume ID from path.
-    AMD: 'AMD Part1/AMD (3)/Image (14).png' → 'AMD_3'
-         'AMD Part1/AMD (3).E2E/Image (5).png' → 'AMD_3'
-    DRUSEN: 'DRUSEN/DRUSEN-142234-1.png' → 'DRUSEN_142234'
+    """Extract a patient / volume ID from a relative image path.
+
+    AMD:    'AMD Part1/AMD (3)/Image (14).png'      -> 'AMD_3'
+            'AMD Part1/AMD (3).E2E/Image (5).png'   -> 'AMD_3'
+    DRUSEN: 'DRUSEN/DRUSEN-142234-1.png'            -> 'DRUSEN_142234'
     """
     parts = image_path.split("/")
 
     if parts[0] == "DRUSEN":
-        # DRUSEN-142234-1.png → patient 142234
+        # File name like DRUSEN-142234-1.png; the second token is the patient.
         fname = parts[-1]
         match = re.match(r"DRUSEN-(\d+)-", fname)
         if match:
@@ -144,7 +144,7 @@ def main():
         pct = n_pos / len(df) * 100
         status = ""
         if n_pos < args.min_samples:
-            status = f" ← WARNING: only {n_pos} images, consider dropping"
+            status = f" <- WARNING: only {n_pos} images, consider dropping"
             drop_biomarkers.append(bm)
         print(f"  {SHORT_NAMES[bm]:>5} ({bm}): {n_pos} images ({pct:.1f}%){status}")
 

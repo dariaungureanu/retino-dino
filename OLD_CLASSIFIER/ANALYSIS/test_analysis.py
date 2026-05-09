@@ -10,7 +10,6 @@ from tqdm import tqdm
 from sklearn.metrics import classification_report, confusion_matrix
 import sys
 
-# --- CONFIG ---
 current_script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_script_dir)
 classifier_dir = os.path.join(project_root, 'OLD_CLASSIFIER')
@@ -60,14 +59,12 @@ def main():
     os.makedirs(RESULT_DIR, exist_ok=True)
     print(f" Device: {args.device}")
 
-    # 1. Load Data Splits and Mappings
     csv_path = os.path.join(args.data_path, "OCTDL_clean_metadata.csv")
     _, _, test_df, disease_map, condition_map = get_data_splits(csv_path)
 
     idx_to_disease = {v: k for k, v in disease_map.items()}
     idx_to_condition = {v: k for k, v in condition_map.items()}
 
-    # 2. Dataset & Loader
     val_transform = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.ToTensor(),
@@ -77,7 +74,6 @@ def main():
     test_ds = OCTDLMultiTaskDataset(test_df, args.data_path, val_transform, disease_map, condition_map)
     test_loader = DataLoader(test_ds, batch_size=32, shuffle=False, num_workers=4)
 
-    # 3. Load Model
     init_checkpoint = SSL_CHECKPOINT_PATH
     if not os.path.exists(init_checkpoint):
         print(f" Warning: Can't find {SSL_CHECKPOINT_PATH}")

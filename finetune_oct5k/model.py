@@ -67,7 +67,6 @@ def load_backbone(arch, checkpoint, device):
                     clean[k[len(prefix):]] = v
                     break
 
-    # pos_embed interpolation
     if "pos_embed" in clean and "pos_embed" in model_keys:
         ckpt_pos = clean["pos_embed"]
         model_pos = model.state_dict()["pos_embed"]
@@ -97,11 +96,10 @@ def load_backbone(arch, checkpoint, device):
 
 class OCT5kModel(nn.Module):
     """
-    Multi-label classifier: DINOv2 backbone - MLP - 4 sigmoid outputs.
+    Multi-label classifier: DINOv2 backbone -> MLP -> sigmoid outputs.
 
-    Key difference from OCTDL/MMRDR: output is 4 INDEPENDENT binary
-    predictions (each can be 0 or 1), NOT mutually exclusive classes.
-    No softmax — sigmoid is applied inside BCEWithLogitsLoss.
+    Output is N INDEPENDENT binary predictions (each 0 or 1), NOT mutually
+    exclusive classes. No softmax: sigmoid is applied inside BCEWithLogitsLoss.
     """
     EMBED_DIM = 384
     NUM_BLOCKS = 12

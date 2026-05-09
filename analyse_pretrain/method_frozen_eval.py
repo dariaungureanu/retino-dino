@@ -1,25 +1,6 @@
 """
 Method - Frozen Feature Evaluation (kNN + Linear Probe)
 
-Purpose:
-    Quantitatively measure the quality of features learned by the DINOv2
-    backbone, WITHOUT any fine-tuning. The backbone is completely frozen;
-    we extract one CLS-token embedding per image, then train simple
-    classifiers (kNN and Logistic Regression) on those embeddings.
-
-What this tells you:
-    - Are the learned features linearly separable by disease class?
-    - How much does domain adaptation improve over ImageNet features?
-    - kNN measures local neighborhood structure in feature space
-    - Linear probe measures global linear separability
-
-    If linear probe >> kNN, the features have good global structure but
-    noisy local neighborhoods. If both are high, features are excellent.
-
-Metrics reported:
-    - Accuracy, Balanced Accuracy, Macro-F1
-    - Per-class classification report (linear probe)
-
 Usage:
     # Domain-adapted checkpoint
     python analyse_pretrain/method_frozen_eval.py \
@@ -29,7 +10,7 @@ Usage:
         --image_root /home/student/Ungureanu_Daria/OCTDL_Cleaned \
         --out_dir results/frozen_eval/domain_adapted
 
-    # Baseline (original ImageNet pretrained — no --checkpoint)
+    # Baseline (no --checkpoint -> ImageNet weights)
     python analyse_pretrain/method_frozen_eval.py \
         --arch dinov2_vits14 \
         --csv /home/student/Ungureanu_Daria/OCTDL_Cleaned/OCTDL_clean_metadata.csv \
@@ -64,11 +45,6 @@ from analyse_shared import (
 )
 
 class FeatureExtractionDataset(Dataset):
-    """
-    Lightweight dataset for frozen feature extraction.
-    Returns only (normalized_tensor, label_string) - no raw image
-    since we don't need visualizations here.
-    """
 
     def __init__(self, image_paths: List[str], labels: List[str], img_size: int = 224):
         self.image_paths = image_paths
@@ -193,9 +169,7 @@ def load_and_split_data(
     return train_paths, train_labels, test_paths, test_labels
 
 
-# ──────────────────────────────────────────────────────────────
 # Feature extraction
-# ──────────────────────────────────────────────────────────────
 
 @torch.no_grad()
 def extract_features(
@@ -236,9 +210,7 @@ def extract_features(
     return features, labels
 
 
-# ──────────────────────────────────────────────────────────────
 # Classifiers
-# ──────────────────────────────────────────────────────────────
 
 def eval_knn(
     x_train: np.ndarray, y_train: np.ndarray,
@@ -313,9 +285,7 @@ def eval_linear_probe(
     return metrics
 
 
-# ──────────────────────────────────────────────────────────────
 # Main
-# ──────────────────────────────────────────────────────────────
 
 def main():
     ap = argparse.ArgumentParser(
@@ -355,7 +325,7 @@ def main():
 
     device = get_device()
 
-    # ── Data ──
+    # Data
     train_paths, train_labels, test_paths, test_labels = load_and_split_data(
         csv_path=args.csv,
         image_root=args.image_root,
@@ -377,18 +347,18 @@ def main():
         num_workers=args.num_workers, pin_memory=True,
     )
 
-    # ── Model ──
+    # Model
     model = load_model(args.arch, args.checkpoint, device)
 
-    # ── Extract ──
+    # Extract
     x_train, y_train = extract_features(model, train_loader, device)
     x_test, y_test = extract_features(model, test_loader, device)
 
-    # ── Evaluate ──
+    # Evaluate
     knn_metrics = eval_knn(x_train, y_train, x_test, y_test, k=args.knn_k)
     lp_metrics = eval_linear_probe(x_train, y_train, x_test, y_test)
 
-    # ── Save ──
+    # Save
     checkpoint_label = args.checkpoint or "ImageNet baseline (no checkpoint)"
     result = {
         "method": "frozen_feature_evaluation",

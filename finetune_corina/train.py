@@ -1,5 +1,5 @@
 """
-Corina Fine-Tuning — Multi-label DME biomarker detection.
+Corina Fine-Tuning - Multi-label DME biomarker detection.
 
 4 sigmoid outputs: DME, HF, ND, Healthy.
 Loss: BCEWithLogitsLoss with pos_weight for class imbalance.
@@ -51,7 +51,6 @@ from dataset import (
 )
 from model import CorinaModel, load_backbone
 
-# ── Defaults ───────────────────────────────────────────────────
 ARCH            = "dinov2_vits14"
 IMG_SIZE        = 224
 BATCH_SIZE      = 32
@@ -85,23 +84,20 @@ def compute_multilabel_metrics(logits, labels, threshold=THRESHOLD):
 
     metrics = {}
 
-    # Per-biomarker metrics
     f1_scores = []
     auc_scores = []
     acc_scores = []
 
     for i, bm in enumerate(BIOMARKERS):
-        # F1
         f1 = f1_score(labels[:, i], preds[:, i], zero_division=0)
         f1_scores.append(f1)
         metrics[f"f1_{bm}"] = f1
 
-        # Accuracy per label
         acc = accuracy_score(labels[:, i], preds[:, i])
         acc_scores.append(acc)
         metrics[f"acc_{bm}"] = acc * 100
 
-        # AUC-ROC (needs both classes present)
+        # AUC-ROC needs both classes present in the batch.
         try:
             auc = roc_auc_score(labels[:, i], probs[:, i])
         except ValueError:
@@ -109,12 +105,11 @@ def compute_multilabel_metrics(logits, labels, threshold=THRESHOLD):
         auc_scores.append(auc)
         metrics[f"auc_{bm}"] = auc
 
-    # Macro averages
     metrics["f1_macro"] = np.mean(f1_scores)
     metrics["auc_macro"] = np.mean(auc_scores)
     metrics["acc_macro"] = np.mean(acc_scores) * 100
 
-    # Exact match accuracy (all 4 labels correct simultaneously)
+    # Exact match: all 4 labels correct simultaneously.
     exact_match = np.all(preds == labels, axis=1).mean() * 100
     metrics["exact_match"] = exact_match
 
@@ -181,7 +176,6 @@ def evaluate_test(model, loader, criterion, device, out_dir):
     preds = (probs >= THRESHOLD).astype(int)
     labels_np = cat_labels.cpu().numpy()
 
-    # Per-biomarker classification report
     print(f"\n{'='*60}")
     print(f"  BIOMARKER DETECTION REPORT")
     print(f"{'='*60}")
@@ -195,7 +189,6 @@ def evaluate_test(model, loader, criterion, device, out_dir):
     print(f"  Macro AUC:    {metrics['auc_macro']:.4f}")
     print(f"  Exact Match:  {metrics['exact_match']:.1f}%")
 
-    # Per-biomarker confusion matrices
     fig, axes = plt.subplots(1, NUM_LABELS, figsize=(5 * NUM_LABELS, 4))
     for i, bm in enumerate(BIOMARKERS):
         cm = confusion_matrix(labels_np[:, i], preds[:, i])
@@ -208,7 +201,7 @@ def evaluate_test(model, loader, criterion, device, out_dir):
         axes[i].set_xlabel("Predicted")
         axes[i].set_ylabel("True")
 
-    fig.suptitle("Corina — Per-Biomarker Confusion Matrices", fontsize=14, fontweight="bold")
+    fig.suptitle("Corina - Per-Biomarker Confusion Matrices", fontsize=14, fontweight="bold")
     plt.tight_layout()
     cm_path = os.path.join(out_dir, "confusion_matrices.png")
     fig.savefig(cm_path, dpi=200, bbox_inches="tight")
@@ -248,7 +241,6 @@ def main():
     print(f"[INFO] Device: {device}")
     os.makedirs(args.save_dir, exist_ok=True)
 
-    # ── Data ───────────────────────────────────────────────────
     train_df, val_df, test_df = load_corina_splits(args.csv, args.data_path)
 
     pos_weights = compute_pos_weights(train_df).to(device)
@@ -266,7 +258,6 @@ def main():
 
     print(f"[DATA] Batches: train={len(train_loader)}, val={len(val_loader)}, test={len(test_loader)}")
 
-    # ── Model ──────────────────────────────────────────────────
     backbone = load_backbone(args.arch, args.checkpoint, device)
     model = CorinaModel(
         backbone=backbone,
@@ -277,7 +268,6 @@ def main():
         head_dropout=args.head_dropout,
     ).to(device)
 
-    # ── Optimizer ──────────────────────────────────────────────
     param_groups = model.get_param_groups(args.lr_backbone, args.lr_heads, args.weight_decay)
     optimizer = optim.AdamW(param_groups)
 
@@ -285,10 +275,9 @@ def main():
     cosine = CosineAnnealingLR(optimizer, T_max=args.epochs - args.warmup_epochs, eta_min=1e-7)
     scheduler = SequentialLR(optimizer, [warmup, cosine], milestones=[args.warmup_epochs])
 
-    # BCEWithLogitsLoss with pos_weight for class imbalance
+    # pos_weight handles class imbalance per biomarker.
     criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weights)
 
-    # ── WandB ──────────────────────────────────────────────────
     run_name = args.run_name or f"{args.arch}_corina_unfreeze{args.unfreeze_last_n}"
     wandb.init(
         project="Corina-FineTune",
@@ -296,13 +285,12 @@ def main():
         config=vars(args),
     )
 
-    # ── Training ───────────────────────────────────────────────
     best_val_f1 = 0.0
     patience_counter = 0
     best_epoch = 0
 
     print(f"\n{'='*60}")
-    print(f"  TRAINING — {args.epochs} epochs, {NUM_LABELS} biomarkers")
+    print(f"  TRAINING - {args.epochs} epochs, {NUM_LABELS} biomarkers")
     print(f"{'='*60}\n")
 
     for epoch in range(1, args.epochs + 1):
@@ -320,13 +308,12 @@ def main():
         lr = optimizer.param_groups[0]["lr"]
 
         print(f"Epoch {epoch:02d}/{args.epochs} ({elapsed:.0f}s) lr={lr:.2e}")
-        print(f"  Train │ loss={t_loss:.4f}  F1_macro={t_met['f1_macro']:.4f}  "
+        print(f"  Train  loss={t_loss:.4f}  F1_macro={t_met['f1_macro']:.4f}  "
               f"AUC_macro={t_met['auc_macro']:.4f}")
-        print(f"  Val   │ loss={v_loss:.4f}  F1_macro={v_met['f1_macro']:.4f}  "
+        print(f"  Val    loss={v_loss:.4f}  F1_macro={v_met['f1_macro']:.4f}  "
               f"AUC_macro={v_met['auc_macro']:.4f}  "
               f"(best_f1={best_val_f1:.4f})")
 
-        # WandB logging
         log_dict = {
             "epoch": epoch, "lr": lr,
             "train/loss": t_loss, "val/loss": v_loss,
@@ -356,14 +343,13 @@ def main():
                 "num_labels": NUM_LABELS,
                 "biomarkers": BIOMARKERS,
             }, save_path)
-            print(f" New best! Saved → {save_path}")
+            print(f" New best! Saved -> {save_path}")
         else:
             patience_counter += 1
             if patience_counter >= args.patience:
                 print(f"\n[EARLY STOP] Best: epoch {best_epoch}, F1={best_val_f1:.4f}")
                 break
 
-    # ── Test ───────────────────────────────────────────────────
     print(f"\n{'='*60}")
     print(f"  FINAL TEST (best checkpoint: epoch {best_epoch})")
     print(f"{'='*60}")
@@ -384,7 +370,6 @@ def main():
           f"AUC={test_met['auc_macro']:.4f}")
     print(f"  Exact Match: {test_met['exact_match']:.1f}%")
 
-    # Save results
     results = {
         "checkpoint": args.checkpoint or "ImageNet baseline",
         "best_epoch": best_epoch,
@@ -396,7 +381,6 @@ def main():
         json.dump(results, f, indent=2)
     print(f"\n[SAVED] {json_path}")
 
-    # WandB test metrics
     test_log = {"test/f1_macro": test_met["f1_macro"],
                 "test/auc_macro": test_met["auc_macro"],
                 "test/exact_match": test_met["exact_match"]}

@@ -1,7 +1,4 @@
-"""
-OCT5k Dataset — Multi-label biomarker detection (9 classes).
-
-"""
+"""OCT5k Dataset - Multi-label biomarker detection (9 classes)."""
 
 import os
 import pandas as pd
@@ -73,17 +70,15 @@ class OCT5kDataset(Dataset):
 def load_oct5k_splits(csv_path, root_dir, test_size=0.2, val_size=0.1,
                       random_state=42, drop_rare=None):
     """
-    Load OCT5k CSV and create train/val/test split by patient.
-    No predefined split exists — we create one.
+    Load OCT5k CSV and create patient-based train/val/test split.
+    No predefined split exists, so we create one.
 
-    Args:
-        drop_rare: minimum positive images to keep a biomarker. Set to e.g. 15
-                   to drop Fluid (only 14 images). None = keep all.
+    drop_rare: minimum positive images required to keep a biomarker. For example,
+    set to 15 to drop Fluid (only 14 images). None keeps everything.
     """
     df = pd.read_csv(csv_path)
     print(f"[DATA] Loaded {len(df)} rows from {csv_path}")
 
-    # Optionally filter biomarkers
     active_biomarkers = BIOMARKERS.copy()
     if drop_rare:
         for bm in BIOMARKERS:
@@ -91,16 +86,14 @@ def load_oct5k_splits(csv_path, root_dir, test_size=0.2, val_size=0.1,
                 print(f"[DATA] Dropping {bm} (only {int(df[bm].sum())} positive images)")
                 active_biomarkers.remove(bm)
 
-    # Split by patient
     patients = df["patient_id"].unique()
     print(f"[DATA] {len(patients)} unique patients")
 
-    # First split: train+val vs test
     train_val_pat, test_pat = train_test_split(
         patients, test_size=test_size, random_state=random_state,
     )
 
-    # Second split: train vs val
+    # Second split is sized relative to the remaining train+val pool.
     relative_val = val_size / (1 - test_size)
     train_pat, val_pat = train_test_split(
         train_val_pat, test_size=relative_val, random_state=random_state,
@@ -114,7 +107,6 @@ def load_oct5k_splits(csv_path, root_dir, test_size=0.2, val_size=0.1,
           f"{len(val_df)} val ({len(val_pat)} patients), "
           f"{len(test_df)} test ({len(test_pat)} patients)")
 
-    # Distribution per split
     for name, split_df in [("Train", train_df), ("Val", val_df), ("Test", test_df)]:
         dist = {SHORT_NAMES[bm]: int(split_df[bm].sum()) for bm in active_biomarkers}
         print(f"[DATA] {name}: {dist}")

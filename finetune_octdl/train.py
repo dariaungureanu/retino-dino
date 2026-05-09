@@ -1,7 +1,6 @@
 """
-Multi-Task Fine-Tuning Pipeline for OCTDL
-
-DINOv2 ViT-S/14 domain-adapted backbone → dual-head classifier.
+Multi-task fine-tuning pipeline for OCTDL: DINOv2 ViT-S/14 domain-adapted
+backbone with a dual-head classifier (disease + condition).
 
 Usage:
     python finetune_octdl/train.py \
@@ -43,7 +42,6 @@ from dataset import (
 )
 from model import OCTDLMultiTaskModel, load_backbone
 
-# ── Defaults ───────────────────────────────────────────────────
 ARCH            = "dinov2_vits14"
 IMG_SIZE        = 224          # match DINOv2 eval resolution
 BATCH_SIZE      = 32
@@ -85,10 +83,7 @@ def compute_metrics(logits, labels, ignore_index=IGNORE_INDEX):
 
 def run_epoch(model, loader, criterion_d, criterion_c, device, optimizer=None,
               scheduler=None, grad_clip=None, epoch=0, phase="train", lambda_cond=1.0):
-    """
-    Unified train/eval epoch.
-    If optimizer is None → evaluation mode (no gradients, no updates).
-    """
+    """Unified train/eval epoch. optimizer=None means eval mode (no grads)."""
     is_train = optimizer is not None
     model.train() if is_train else model.eval()
 
@@ -237,7 +232,7 @@ def main():
 
     args = parser.parse_args()
 
-    # ── Setup ──────────────────────────────────────────────────
+    # Setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[INFO] Device: {device}")
     if device.type == "cuda":
@@ -250,9 +245,9 @@ def main():
     if args.img_size % 14 != 0:
         print(f"[WARN] img_size={args.img_size} not divisible by 14 (patch size)!")
     grid = args.img_size // 14
-    print(f"[INFO] Resolution: {args.img_size}×{args.img_size} → {grid}×{grid} = {grid**2} patches")
+    print(f"[INFO] Resolution: {args.img_size}x{args.img_size} -> {grid}x{grid} = {grid**2} patches")
 
-    # ── Data ───────────────────────────────────────────────────
+    # Data
     csv_path = os.path.join(args.data_path, "OCTDL_clean_metadata.csv")
     train_df, val_df, test_df, disease_map, condition_map = get_data_splits(csv_path)
 
@@ -278,19 +273,19 @@ def main():
 
     print(f"[DATA] Batches per epoch: train={len(train_loader)}, val={len(val_loader)}, test={len(test_loader)}")
 
-    # ── Model ──────────────────────────────────────────────────
+    # Model
     backbone = load_backbone(args.arch, args.checkpoint, device)
     model = OCTDLMultiTaskModel(
         backbone=backbone,
         num_diseases=len(disease_map),
         num_conditions=len(condition_map),
-        freeze_backbone=(args.unfreeze_last_n < 12),  # If unfreeze_last_n=12 → full unfreeze
+        freeze_backbone=(args.unfreeze_last_n < 12),  # 12 means full fine-tune
         unfreeze_last_n=args.unfreeze_last_n,
         head_hidden=args.head_hidden,
         head_dropout=args.head_dropout,
     ).to(device)
 
-    # ── Optimizer with differential LR ─────────────────────────
+    # Optimizer with differential LR
     param_groups = model.get_param_groups(
         lr_backbone=args.lr_backbone,
         lr_heads=args.lr_heads,
@@ -298,7 +293,7 @@ def main():
     )
     optimizer = optim.AdamW(param_groups)
 
-    # ── LR Scheduler: linear warmup → cosine decay ────────────
+    # LR scheduler: linear warmup, then cosine decay
     warmup_scheduler = LinearLR(
         optimizer, start_factor=0.01, total_iters=args.warmup_epochs,
     )
@@ -311,11 +306,11 @@ def main():
         milestones=[args.warmup_epochs],
     )
 
-    # ── Loss functions ─────────────────────────────────────────
+    # Loss functions
     criterion_d = nn.CrossEntropyLoss(weight=weights_d)
     criterion_c = nn.CrossEntropyLoss(weight=weights_c, ignore_index=IGNORE_INDEX)
 
-    # ── WandB ──────────────────────────────────────────────────
+    # WandB
     run_name = args.run_name or f"{args.arch}_unfreeze{args.unfreeze_last_n}_{args.img_size}px"
     wandb.init(
         project=args.wandb_project,
@@ -343,13 +338,13 @@ def main():
         },
     )
 
-    # ── Training Loop ──────────────────────────────────────────
+    # Training loop
     best_val_f1 = 0.0
     patience_counter = 0
     best_epoch = 0
 
     print(f"\n{'='*60}")
-    print(f"  TRAINING START — {args.epochs} epochs")
+    print(f"  TRAINING START - {args.epochs} epochs")
     print(f"{'='*60}\n")
 
     for epoch in range(1, args.epochs + 1):
@@ -376,9 +371,9 @@ def main():
 
         # Print summary
         print(f"\nEpoch {epoch:02d}/{args.epochs} ({elapsed:.0f}s)  lr={current_lr:.2e}")
-        print(f"  Train │ loss={t_loss:.4f}  disease_F1={t_met_d['macro_f1']:.4f}  "
+        print(f"  Train  loss={t_loss:.4f}  disease_F1={t_met_d['macro_f1']:.4f}  "
               f"cond_F1={t_met_c['macro_f1']:.4f}")
-        print(f"  Val   │ loss={v_loss:.4f}  disease_F1={v_met_d['macro_f1']:.4f}  "
+        print(f"  Val    loss={v_loss:.4f}  disease_F1={v_met_d['macro_f1']:.4f}  "
               f"cond_F1={v_met_c['macro_f1']:.4f}  "
               f"(best={best_val_f1:.4f})")
 
@@ -419,7 +414,7 @@ def main():
                 "disease_map": disease_map,
                 "condition_map": condition_map,
             }, save_path)
-            print(f"  New best! Saved → {save_path}")
+            print(f"  New best! Saved -> {save_path}")
         else:
             patience_counter += 1
             if patience_counter >= args.patience:
@@ -427,7 +422,7 @@ def main():
                       f"Best: epoch {best_epoch}, F1={best_val_f1:.4f}")
                 break
 
-    # ── Test Evaluation on Best Checkpoint ─────────────────────
+    # Test evaluation on best checkpoint
     print(f"\n{'='*60}")
     print(f"  FINAL TEST EVALUATION (best checkpoint: epoch {best_epoch})")
     print(f"{'='*60}")

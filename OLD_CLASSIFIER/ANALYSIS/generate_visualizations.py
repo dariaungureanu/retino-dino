@@ -12,7 +12,6 @@ from sklearn.manifold import TSNE
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
-# --- SETUP PATHS ---
 current_script_path = os.path.abspath(__file__)
 current_dir = os.path.dirname(current_script_path)
 project_root = os.path.dirname(current_dir)
@@ -38,7 +37,6 @@ except ImportError as e:
     print(f"Import Error: {e}")
     sys.exit(1)
 
-# --- CONFIGURATION ---
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Running on: {DEVICE}")
 
@@ -89,7 +87,6 @@ def load_resources():
     return model, loader, idx_to_disease, idx_to_condition, test_ds, disease_map, condition_map
 
 
-# --- T-SNE VISUALIZATION ---
 def plot_tsne(model, loader, idx_to_disease):
     tsne_save_path = os.path.join(output_dir, "tsne_plot.png")
     if os.path.exists(tsne_save_path):
@@ -138,9 +135,6 @@ def plot_tsne(model, loader, idx_to_disease):
     print(f"t-SNE plot saved to: {tsne_save_path}")
 
 
-# -------------------------
-#   GRADCAM IMPROVEMENTS
-# -------------------------
 class MultiTaskWrapper(torch.nn.Module):
     def __init__(self, model, target_index):
         super().__init__()
@@ -153,10 +147,6 @@ class MultiTaskWrapper(torch.nn.Module):
 
 
 def reshape_transform(tensor):
-    """
-    For ViT: tensor shape [B, tokens, C]
-    Remove CLS token, reshape tokens -> [B, C, H, W]
-    """
     result = tensor[:, 1:, :]  # drop CLS
     grid_size = int(np.sqrt(result.size(1)))
     result = result.reshape(tensor.size(0), grid_size, grid_size, tensor.size(2))
@@ -173,11 +163,6 @@ def denormalize_to_rgb(img_tensor_1x3xhxw):
 
 
 def collect_predictions(model, loader, device, task_head=0):
-    """
-    task_head=0 -> disease head
-    task_head=1 -> condition head
-    Returns: y_true, y_pred, y_conf, sample_indices
-    """
     model.eval()
     y_true, y_pred, y_conf, sample_indices = [], [], [], []
 
@@ -213,7 +198,7 @@ def select_top_wrong(y_true, y_pred, y_conf, idxs, topk=8):
     wrong_conf = y_conf[wrong_mask]
     if len(wrong) == 0:
         return np.array([], dtype=int)
-    order = np.argsort(-wrong_conf)  # desc by confidence
+    order = np.argsort(-wrong_conf)
     return wrong[order[:topk]]
 
 
@@ -248,7 +233,6 @@ def generate_cam_for_task_compare_pred_true(
 
     print(f"Generating GradCAM (pred vs true) for task: {task_name}...")
 
-    # ensure grads
     for p in model.backbone.parameters():
         p.requires_grad = True
 
@@ -269,16 +253,14 @@ def generate_cam_for_task_compare_pred_true(
         img_tensor, label_d, label_c = dataset[idx]
         img_tensor = img_tensor.unsqueeze(0).to(DEVICE)
 
-        # true label for the head
         current_label = label_d if head_index == 0 else label_c
         label_val = int(current_label.item() if isinstance(current_label, torch.Tensor) else current_label)
         if label_val == -100:
             print(f"Skipping sample {idx} (ignore label -100)")
             continue
 
-        # forward for pred/conf
         with torch.no_grad():
-            logits = wrapper(img_tensor)  # [1, num_classes]
+            logits = wrapper(img_tensor)
             probs = softmax(logits)
             pred_class = int(torch.argmax(probs, dim=1).item())
             pred_conf = float(torch.max(probs, dim=1).values.item())
@@ -288,7 +270,6 @@ def generate_cam_for_task_compare_pred_true(
 
         rgb_img = denormalize_to_rgb(img_tensor)
 
-        # CAM for predicted vs true
         cam_pred = cam(input_tensor=img_tensor, targets=[ClassifierOutputTarget(pred_class)])[0, :]
         cam_true = cam(input_tensor=img_tensor, targets=[ClassifierOutputTarget(label_val)])[0, :]
 
@@ -297,19 +278,16 @@ def generate_cam_for_task_compare_pred_true(
 
         row = i + 1
 
-        # 1) Original
         plt.subplot(num_samples, 3, (row - 1) * 3 + 1)
         plt.imshow(rgb_img)
         plt.title(f"[{task_name}] TRUE: {true_name}\nPRED: {pred_name} (conf={pred_conf:.2f})")
         plt.axis("off")
 
-        # 2) CAM pred
         plt.subplot(num_samples, 3, (row - 1) * 3 + 2)
         plt.imshow(vis_pred)
         plt.title(f"CAM for PRED: {pred_name}")
         plt.axis("off")
 
-        # 3) CAM true
         plt.subplot(num_samples, 3, (row - 1) * 3 + 3)
         plt.imshow(vis_true)
         plt.title(f"CAM for TRUE: {true_name}")

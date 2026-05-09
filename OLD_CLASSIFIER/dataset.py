@@ -7,21 +7,12 @@ from sklearn.model_selection import train_test_split
 
 class OCTDLMultiTaskDataset(Dataset):
     def __init__(self, dataframe, root_dir, transform=None, disease_map=None, condition_map=None):
-        """
-        Args:
-            dataframe (pd.DataFrame): DataFrame containing the filtered data for this split (train/val).
-            root_dir (str): Path to the 'OCTDL_Cleaned' folder.
-            transform (callable, optional): Transform to apply to the image.
-            disease_map (dict): Mapping {'AMD': 0, 'DME': 1, ...}.
-            condition_map (dict): Mapping {'CNV': 0, ...}.
-        """
+
         self.df = dataframe.reset_index(drop=True)
         self.root_dir = root_dir
         self.transform = transform
         self.disease_map = disease_map
         self.condition_map = condition_map
-
-        # Determine the ignore index (usually -100 for CrossEntropyLoss in PyTorch)
         self.IGNORE_INDEX = -100
 
     def __len__(self):
@@ -30,26 +21,19 @@ class OCTDLMultiTaskDataset(Dataset):
     def __getitem__(self, idx):
         row = self.df.iloc[idx]
 
-        # 1. Construct Image Path
-        # Structure: root_dir / disease_name / filename
         img_name = row['file_name']
         disease_folder = row['disease']
         img_path = os.path.join(self.root_dir, disease_folder, img_name)
 
-        # 2. Load Image
         image = Image.open(img_path).convert("RGB")
-
         if self.transform:
             image = self.transform(image)
 
-        # 3. Get Disease Label
         disease_str = str(row['label_disease'])
         label_disease = self.disease_map[disease_str]
 
-        # 4. Get Condition Label
-        # If the condition is not in map return -100
+        # Conditions outside the map become IGNORE_INDEX so the loss masks them.
         condition_str = str(row['label_condition_raw'])
-
         if condition_str in self.condition_map:
             label_condition = self.condition_map[condition_str]
         else:

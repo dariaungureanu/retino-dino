@@ -87,7 +87,7 @@ def load_ssl_backbone(weights_path):
     """
     model = _build_dinov2()
 
-    if weights_path is None: #skip this step -> keep ImageNet weights
+    if weights_path is None:
         return model
 
     if not os.path.isfile(weights_path):
@@ -254,14 +254,10 @@ TASKS = {
 
 
 # Cached model loading
-@st.cache_resource(show_spinner=False) # the model is only loaded once,
+@st.cache_resource(show_spinner=False)
 def get_model(task_key: str, variant: str):
-    """Returns (model, labels). `labels` is a dict whose contents depend on
-    task type and are derived from the saved maps in the checkpoint:
-        octdl       -> {"disease": [...], "condition": [...]}
-        single      -> {"classes":   [...]}
-        multilabel  -> {"biomarkers": [...]}
-    """
+    """Return (model, labels). `labels` is derived from the saved maps in
+    the checkpoint and falls back to the spec lists when absent."""
     spec = TASKS[task_key]
     ckpt_name = spec["ckpt_da"] if variant == "da" else spec["ckpt_in"]
     ckpt_path = os.path.join(CKPT_DIR, ckpt_name)
@@ -270,7 +266,6 @@ def get_model(task_key: str, variant: str):
 
     ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
 
-    #Load the SSL backbone or hub ImageNet
     backbone_weights = SSL_BACKBONE if variant == "da" else None
     backbone = load_ssl_backbone(backbone_weights)
 
@@ -312,7 +307,6 @@ def get_model(task_key: str, variant: str):
 
     missing, unexpected = model.load_state_dict(ckpt["model_state_dict"], strict=False)
 
-    # report if keys dont match (head missing means the checkpoint is not compatible with the model architecture)
     head_missing = [k for k in missing if "head" in k]
     backbone_missing = [k for k in missing if "head" not in k]
     head_unexpected = [k for k in unexpected if "head" in k]
@@ -376,12 +370,7 @@ def denormalize(t: torch.Tensor) -> np.ndarray:
 
 
 def predict(model, x, task_type):
-    """
-      Runs the model and converts logits to probabilities:
-      - Softmax for OCTDL/MMRDR (mutually exclusive classes - they sum to 1).
-      - Sigmoid for Corina/OCT5k (independent biomarkers - each one is "yes/no" on its
-      own).
-    """
+    """Forward pass + softmax (octdl/single) or sigmoid (multilabel)."""
     with torch.no_grad():
         out = model(x)
     if task_type == "octdl":
@@ -394,7 +383,8 @@ def predict(model, x, task_type):
 
 
 def gradcam(model, x, task_type, target_kind, target_idx):
-    """Wraps the model in _HeadSelector so GradCAM sees a single output."""
+    """Run GradCAM on the last ViT block. For OCTDL the multi-output forward
+    is wrapped in _HeadSelector so GradCAM sees a single tensor."""
     target_layers = [model.backbone.blocks[-1].norm1]
 
     if task_type == "octdl":
@@ -421,9 +411,6 @@ _BAR_FIG_W  = 4.8
 _BAR_ROW_H  = 0.38
 _BAR_PAD_H  = 0.95
 
-# Display sizes for GradCAM panels (px). One "hero" size for the single
-# inspection view and the compare-mode 2x2 panels, and a smaller "grid" size
-# for the multi-label tile grid so 4 OCT5k panels in a row stay readable.
 GRADCAM_HERO_W = 360
 GRADCAM_GRID_W = 280
 
@@ -433,12 +420,7 @@ def _truncate(label, n=14):
 
 
 def _bar_chart(probs, classes, predicted_idx, title=""):
-    """
-    A horizontal bar chart for single-label outputs (softmax).
-      - All bars are blue, except the predicted one is red
-      - X-axis is locked to 0–100 (probabilities as %).
-      - Each bar has its number labeled to the right
-    """
+    """Horizontal softmax bar chart; the predicted bar is highlighted red."""
     fig, ax = plt.subplots(
         figsize=(_BAR_FIG_W, _BAR_ROW_H * len(classes) + _BAR_PAD_H)
     )
@@ -462,12 +444,8 @@ def _bar_chart(probs, classes, predicted_idx, title=""):
 
 
 def _multilabel_panel(probs, labels, threshold=0.5, title=""):
-    """
-      For multi-label outputs (sigmoid):
-          - Bars are green if prob ≥ 0.5 (predicted "present"), grey otherwise.
-          - A red dashed vertical line marks the 0.5 decision threshold.
-          - The model can predict any number of biomarkers (zero, one, several).
-    """
+    """Horizontal sigmoid bar chart; bars >= threshold are green, others grey,
+    with a dashed vertical line at the threshold."""
     fig, ax = plt.subplots(
         figsize=(_BAR_FIG_W, _BAR_ROW_H * len(labels) + _BAR_PAD_H)
     )
@@ -504,16 +482,11 @@ def _confidence_caption(container, max_conf, n_classes):
 
 def render_predictions(spec, labels, preds, container, header,
                        side_by_side=True, threshold=0.5):
-    """
-      The dispatcher. Reads spec["type"] and renders the right format:
-      - "octdl" - two bar charts (one per head) + two argmax summaries.
-      - "single" - one bar chart + the predicted class.
-      - "multilabel" - the panel + a "Active biomarkers (>=threshold): X, Y" line.
+    """Dispatch on spec["type"] and render the appropriate predictions panel.
 
-    `labels` is the display dict produced by get_model (derived from the saved
-    maps). `side_by_side` is OCTDL-only: True puts disease+condition charts in
-    two columns, False stacks them (used in compare mode where each model
-    already lives in its own column and nesting more would not fit).
+    `side_by_side` is OCTDL-only: False stacks disease and condition charts
+    so the panel fits inside an outer column in compare mode (Streamlit caps
+    column nesting).
     """
     if header:
         container.markdown(f"#### {header}")
@@ -644,8 +617,7 @@ def list_samples(task_key: str):
 
 
 def parse_sample_label(task_key: str, filename: str) -> str:
-    """  Extracts the expected label from the filename so the user can sanity-check
-    predictions."""
+    """Extract the expected label encoded in a sample filename."""
     base = os.path.splitext(filename)[0]
     parts = base.split("_")
 
@@ -703,7 +675,6 @@ def gallery_files(task_key, mtimes):
                     full = os.path.join(root, n)
                     rel = os.path.relpath(full, ROOT).replace(os.sep, "/")
                     files.append((rel, full))
-    # de-dup, preserve order
     seen = set()
     out = []
     for rel, full in files:
@@ -906,7 +877,8 @@ def main():
             type=["png", "jpg", "jpeg", "bmp", "tif", "tiff"],
         )
 
-        #Sample dropdown, the "(none)" sentinel keeps the dropdown valid when the user wants to upload instead
+        # "(none)" - keeps the dropdown valid when the user wants to
+        # upload an image instead of picking a sample
         samples = list_samples(task_key)
         sample_choice = None
         if samples:
@@ -1005,8 +977,7 @@ def main():
                 with st.spinner("Computing GradCAM (ImageNet)..."):
                     cam_in = gradcam(model_in, x, spec["type"], target_kind, target_idx)
 
-        DISPLAY_HEIGHT = GRADCAM_HERO_W  # the gradcam is square (224x224),
-        # so resizing it to height=GRADCAM_HERO_W also makes it that wide.
+        DISPLAY_HEIGHT = GRADCAM_HERO_W
         cam_h = Image.fromarray(cam_da) if cam_da is not None else None
 
         st.markdown("### Results")
@@ -1114,11 +1085,10 @@ def main():
 
 
 def _target_picker(spec, labels, force_focus=False):
-    """Returns (kind, idx, label, focus). For multilabel tasks `focus` is a
-    flag: when False the GradCAM grid view is used; when True we fall back to
-    a single-target dropdown for higher-detail inspection. `force_focus=True`
-    is used in compare mode to keep the layout sane (a 2x grid x 2 models is
-    too busy)."""
+    """Return (kind, idx, label, focus). For multilabel tasks, focus=False
+    triggers the GradCAM grid view; focus=True falls back to a single-target
+    dropdown. `force_focus=True` is used in compare mode where two grids do
+    not fit side by side."""
     if spec["type"] == "octdl":
         kind = st.radio("GradCAM head", ["disease", "condition"],
                         horizontal=True, format_func=str.capitalize)

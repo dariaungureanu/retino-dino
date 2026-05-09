@@ -178,7 +178,7 @@ def train_and_evaluate(
     test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE, shuffle=False,
                              num_workers=NUM_WORKERS, pin_memory=True)
 
-    # Model — fresh for each fraction (reload backbone each time)
+    # Reload the backbone for every fraction so the model starts fresh.
     backbone = load_backbone(ARCH, checkpoint, device)
     model = OCTDLMultiTaskModel(
         backbone=backbone,
@@ -228,7 +228,7 @@ def train_and_evaluate(
             patience_counter += 1
             marker = ""
 
-        print(f"  Ep {epoch:02d} │ train_f1={t_d['macro_f1']:.3f}  "
+        print(f"  Ep {epoch:02d}  train_f1={t_d['macro_f1']:.3f}  "
               f"val_f1={v_d['macro_f1']:.3f}  best={best_val_f1:.3f} {marker}")
 
         if patience_counter >= PATIENCE:
@@ -272,7 +272,7 @@ def plot_efficiency_curve(results, fractions, out_dir, label=""):
     ax1.plot(fractions, cond_f1s, "s--", color="#FF9800", linewidth=2, markersize=8, label="Condition Macro-F1")
     ax1.set_xlabel("Training Data Fraction", fontsize=12)
     ax1.set_ylabel("Macro-F1", fontsize=12)
-    ax1.set_title(f"Data Efficiency — Macro-F1 {label}", fontsize=13, fontweight="bold")
+    ax1.set_title(f"Data Efficiency - Macro-F1 {label}", fontsize=13, fontweight="bold")
     ax1.set_xticks(fractions)
     ax1.set_xticklabels([f"{f:.0%}\n({n} imgs)" for f, n in zip(fractions, n_imgs)])
     ax1.legend(fontsize=10)
@@ -283,7 +283,7 @@ def plot_efficiency_curve(results, fractions, out_dir, label=""):
     ax2.plot(fractions, accs, "o-", color="#4CAF50", linewidth=2, markersize=8, label="Disease Accuracy")
     ax2.set_xlabel("Training Data Fraction", fontsize=12)
     ax2.set_ylabel("Accuracy (%)", fontsize=12)
-    ax2.set_title(f"Data Efficiency — Accuracy {label}", fontsize=13, fontweight="bold")
+    ax2.set_title(f"Data Efficiency - Accuracy {label}", fontsize=13, fontweight="bold")
     ax2.set_xticks(fractions)
     ax2.set_xticklabels([f"{f:.0%}\n({n} imgs)" for f, n in zip(fractions, n_imgs)])
     ax2.legend(fontsize=10)
@@ -317,7 +317,7 @@ def plot_comparison(results_a_path, results_b_path, label_a, label_b, out_dir):
     ax1.plot(fracs_b, f1s_b, "s--", linewidth=2, markersize=8, label=label_b, color="#F44336")
     ax1.set_xlabel("Training Data Fraction", fontsize=12)
     ax1.set_ylabel("Disease Macro-F1", fontsize=12)
-    ax1.set_title("Data Efficiency — Domain-Adapted vs ImageNet", fontsize=13, fontweight="bold")
+    ax1.set_title("Data Efficiency - Domain-Adapted vs ImageNet", fontsize=13, fontweight="bold")
     ax1.legend(fontsize=11)
     ax1.grid(True, alpha=0.3)
     ax1.set_ylim([0.4, 1.0])
@@ -326,7 +326,7 @@ def plot_comparison(results_a_path, results_b_path, label_a, label_b, out_dir):
     ax2.plot(fracs_b, accs_b, "s--", linewidth=2, markersize=8, label=label_b, color="#F44336")
     ax2.set_xlabel("Training Data Fraction", fontsize=12)
     ax2.set_ylabel("Disease Accuracy (%)", fontsize=12)
-    ax2.set_title("Data Efficiency — Accuracy Comparison", fontsize=13, fontweight="bold")
+    ax2.set_title("Data Efficiency - Accuracy Comparison", fontsize=13, fontweight="bold")
     ax2.legend(fontsize=11)
     ax2.grid(True, alpha=0.3)
     ax2.set_ylim([50, 100])
@@ -372,7 +372,7 @@ def main():
     print(f"[INFO] Device: {device}")
     os.makedirs(args.out_dir, exist_ok=True)
 
-    # Load data — FIXED splits
+    # Splits are fixed across all fractions so val/test stay comparable.
     csv_path = os.path.join(args.data_path, "OCTDL_clean_metadata.csv")
     train_df, val_df, test_df, disease_map, condition_map = get_data_splits(csv_path)
 
@@ -410,7 +410,7 @@ def main():
 
     # Summary table
     print(f"\n{'='*70}")
-    print(f"  DATA EFFICIENCY SUMMARY — {checkpoint_label}")
+    print(f"  DATA EFFICIENCY SUMMARY - {checkpoint_label}")
     print(f"{'='*70}")
     print(f"  {'Fraction':<10} {'N_train':<10} {'Disease F1':<12} {'Disease Acc':<12} {'Cond F1':<12}")
     print(f"  {'-'*56}")

@@ -1,5 +1,5 @@
 """
-Corina Dataset — Multi-label DME biomarker detection.
+Corina Dataset - Multi-label DME biomarker detection.
 
 4 binary outputs: DME, HF, ND, Healthy (each present/absent).
 Uses BCEWithLogitsLoss (sigmoid per output), NOT CrossEntropyLoss.
@@ -79,15 +79,14 @@ def load_corina_splits(csv_path, root_dir, val_size=0.1, random_state=42):
 
     print(f"[DATA] Predefined: {len(train_full)} train, {len(test_df)} test")
 
-    # Biomarker distribution
     for split_name, split_df in [("Train", train_full), ("Test", test_df)]:
         dist = {bm: int(split_df[bm].sum()) for bm in BIOMARKERS}
         print(f"[DATA] {split_name} biomarkers: {dist}")
 
-    # Carve val from train — split by patient
+    # Carve val from train at the patient level.
     train_patients = train_full[["patient_id"]].drop_duplicates()
 
-    # Create a rough stratification key from the most common biomarker per patient
+    # Stratification key: most common biomarker per patient.
     patient_majority = train_full.groupby("patient_id")[BIOMARKERS].mean().idxmax(axis=1)
     train_patients = train_patients.set_index("patient_id")
     train_patients["strat_key"] = patient_majority
@@ -100,7 +99,7 @@ def load_corina_splits(csv_path, root_dir, val_size=0.1, random_state=42):
             stratify=train_patients["strat_key"].values,
         )
     except ValueError:
-        # If stratification fails (too few patients per class), fall back to random
+        # Fall back to random split if stratification fails (too few patients per class).
         print("[WARN] Stratified val split failed, using random split")
         train_pat, val_pat = train_test_split(
             train_patients.index.to_numpy(),

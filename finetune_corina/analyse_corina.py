@@ -1,11 +1,5 @@
 """
-Corina Explainability — t-SNE + GradCAM for multi-label biomarker detection.
-
-Generates:
-  1. t-SNE colored by dominant biomarker
-  2. GradCAM per biomarker on correct detections (implicit localization)
-  3. GradCAM on top errors per biomarker
-  4. Multi-biomarker comparison: same image, 4 heatmaps side by side
+Corina Explainability - t-SNE + GradCAM for multi-label biomarker detection.
 
 Usage:
     python finetune_corina/analyse_corina.py \
@@ -78,11 +72,7 @@ def extract_features(model, loader, device):
 
 
 def plot_tsne(features, labels, out_path, perplexity=30):
-    """
-    t-SNE colored by dominant biomarker combination.
-    Since multi-label, we create a string label from the binary vector.
-    """
-    # Create combination labels
+    """t-SNE colored by biomarker combination (string built from the binary vector)."""
     combo_names = []
     for row in labels:
         active = [BIOMARKERS[i] for i in range(NUM_LABELS) if row[i] == 1]
@@ -105,7 +95,7 @@ def plot_tsne(features, labels, out_path, perplexity=30):
                     label=f"{combo} ({count})", color=palette[i],
                     alpha=0.7, s=40, edgecolors="white", linewidths=0.3)
 
-    plt.title("t-SNE — Biomarker Combination Feature Space", fontsize=14, fontweight="bold")
+    plt.title("t-SNE - Biomarker Combination Feature Space", fontsize=14, fontweight="bold")
     plt.legend(bbox_to_anchor=(1.02, 1), loc="upper left", fontsize=9, title="Biomarkers")
     plt.xlabel("t-SNE 1")
     plt.ylabel("t-SNE 2")
@@ -158,10 +148,7 @@ def collect_predictions(model, loader, device):
 
 def generate_per_biomarker_gradcam(model, dataset, sample_indices,
                                     save_path, device, title="GradCAM"):
-    """
-    For each sample, show Original + GradCAM for EACH biomarker side by side.
-    Layout: rows = samples, columns = [Original, DME_cam, HF_cam, ND_cam, Healthy_cam]
-    """
+    """For each sample show Original + GradCAM for EACH biomarker (side by side)."""
     try:
         from pytorch_grad_cam import GradCAM
         from pytorch_grad_cam.utils.image import show_cam_on_image
@@ -178,7 +165,7 @@ def generate_per_biomarker_gradcam(model, dataset, sample_indices,
         p.requires_grad_(True)
 
     n = len(sample_indices)
-    n_cols = 1 + NUM_LABELS  # original + one cam per biomarker
+    n_cols = 1 + NUM_LABELS
 
     fig, axes = plt.subplots(n, n_cols, figsize=(4 * n_cols, 4 * n))
     if n == 1:
@@ -191,27 +178,23 @@ def generate_per_biomarker_gradcam(model, dataset, sample_indices,
         img_input = img_tensor.unsqueeze(0).to(device)
         rgb_img = denormalize(img_input)
 
-        # Get predictions
         with torch.no_grad():
             logits = model(img_input)
             probs = torch.sigmoid(logits).cpu().numpy()[0]
 
-        # True label string
         true_str = "+".join([BIOMARKERS[j] for j in range(NUM_LABELS) if true_labels[j] == 1]) or "None"
         pred_str = "+".join([f"{BIOMARKERS[j]}({probs[j]:.2f})" for j in range(NUM_LABELS) if probs[j] >= THRESHOLD]) or "None"
 
-        # Original image
         axes[i, 0].imshow(rgb_img)
         axes[i, 0].set_title(f"TRUE: {true_str}\nPRED: {pred_str}", fontsize=8)
         axes[i, 0].axis("off")
 
-        # GradCAM per biomarker
         for j, bm in enumerate(BIOMARKERS):
             wrapper = BiomarkerWrapper(model, j)
             cam = GradCAM(model=wrapper, target_layers=target_layers,
                           reshape_transform=reshape_transform_vit)
 
-            # Target: always compute CAM for "present" (class 1)
+            # Always target the single output of the wrapper (the "present" logit).
             cam_map = cam(input_tensor=img_input,
                           targets=[ClassifierOutputTarget(0)])[0]
 
@@ -233,22 +216,18 @@ def generate_per_biomarker_gradcam(model, dataset, sample_indices,
 
 def select_samples_multilabel(probs, labels, indices, biomarker_idx=None,
                                correct=True, topk=6):
-    """
-    Select samples for GradCAM visualization.
-    For multi-label: "correct" means the specific biomarker prediction matches truth.
-    """
+    """Select samples for GradCAM. "correct" means the specified biomarker matches truth."""
     preds = (probs >= THRESHOLD).astype(int)
 
     if biomarker_idx is not None:
         if correct:
             mask = preds[:, biomarker_idx] == labels[:, biomarker_idx]
-            # Only where biomarker is actually present (more interesting)
+            # Only keep samples where the biomarker is actually present.
             mask = mask & (labels[:, biomarker_idx] == 1)
         else:
             mask = preds[:, biomarker_idx] != labels[:, biomarker_idx]
         conf = probs[:, biomarker_idx]
     else:
-        # Overall: exact match or not
         if correct:
             mask = np.all(preds == labels, axis=1)
         else:
@@ -288,17 +267,15 @@ def main():
     test_loader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False,
                              num_workers=args.num_workers, pin_memory=True)
 
-    # ── t-SNE ──────────────────────────────────────────────────
     if not args.skip_tsne:
         features, labels = extract_features(model, test_loader, device)
         plot_tsne(features, labels,
                   os.path.join(args.out_dir, "tsne_biomarkers.png"))
 
-    # ── GradCAM ────────────────────────────────────────────────
     if not args.skip_gradcam:
         probs, labels, idx = collect_predictions(model, test_loader, device)
 
-        # 1. Per-biomarker correct detections (implicit localization)
+        # Per-biomarker correct detections (implicit localization).
         for j, bm in enumerate(BIOMARKERS):
             correct_samples = select_samples_multilabel(
                 probs, labels, idx, biomarker_idx=j,
@@ -307,20 +284,20 @@ def main():
             generate_per_biomarker_gradcam(
                 model, test_ds, correct_samples, device=device,
                 save_path=os.path.join(args.out_dir, f"gradcam_correct_{bm}.png"),
-                title=f"GradCAM — Correct {bm} Detections (per-biomarker view)",
+                title=f"GradCAM - Correct {bm} Detections (per-biomarker view)",
             )
 
-        # 2. Overall top errors (exact match failures)
+        # Overall top errors (exact-match failures).
         error_samples = select_samples_multilabel(
             probs, labels, idx, correct=False, topk=args.topk,
         )
         generate_per_biomarker_gradcam(
             model, test_ds, error_samples, device=device,
             save_path=os.path.join(args.out_dir, "gradcam_top_errors.png"),
-            title="GradCAM — Top Errors (per-biomarker view)",
+            title="GradCAM - Top Errors (per-biomarker view)",
         )
 
-        # 3. Per-biomarker errors
+        # Per-biomarker errors.
         for j, bm in enumerate(BIOMARKERS):
             err_samples = select_samples_multilabel(
                 probs, labels, idx, biomarker_idx=j,
@@ -329,7 +306,7 @@ def main():
             generate_per_biomarker_gradcam(
                 model, test_ds, err_samples, device=device,
                 save_path=os.path.join(args.out_dir, f"gradcam_errors_{bm}.png"),
-                title=f"GradCAM — {bm} Detection Errors",
+                title=f"GradCAM - {bm} Detection Errors",
             )
 
     print(f"\n[DONE] All outputs: {args.out_dir}")

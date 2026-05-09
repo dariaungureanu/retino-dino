@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 from sklearn.decomposition import PCA
 import argparse
-# --- USER SETTINGS ---
+
 IMAGE_PATH = r"D:\Ungureanu_Daria\OCTDL_Cleaned\DME\dme_1434389_1.jpg"
 CHECKPOINT_PATH = r"D:\Ungureanu_Daria\retino-dino\checkpoints_dino_oct_optimized\dinov2_oct_opt_latest.pth"
 PATCH_SIZE = 14
@@ -27,7 +27,6 @@ def main(image_path=None, output_name=None):
     print("Loading base DINOv2 architecture from Meta...")
     model = torch.hub.load('facebookresearch/dinov2', 'dinov2_vitb14')
 
-    #take weights from checkpint + load into model
     print(f"Injecting domain-adapted weights from: {os.path.basename(CHECKPOINT_PATH)}")
     checkpoint = torch.load(CHECKPOINT_PATH, map_location=device)
 
@@ -38,7 +37,6 @@ def main(image_path=None, output_name=None):
             clean_key = key.replace("backbone.", "")
             clean_state_dict[clean_key] = value
 
-    #load the weights into the mode
     model.load_state_dict(clean_state_dict, strict=True)
     model.to(device)
     model.eval()

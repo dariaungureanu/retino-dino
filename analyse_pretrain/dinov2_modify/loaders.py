@@ -70,7 +70,6 @@ def _parse_dataset_str(dataset_str: str):
         class_ = CHAMMI_HPA
     elif name == "OCTDataset":
         class_ = OCTDataset
-        # We hardcode the path here to guarantee it finds your data
         kwargs["root"] = "/home/student/Ungureanu_Daria/dinov2_dataset/train"
     else:
         raise ValueError(f'Unsupported dataset "{name}"')

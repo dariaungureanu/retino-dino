@@ -23,16 +23,12 @@ class RemoveTopBackgroundRobust:
 
     def __call__(self, img: Image.Image) -> Image.Image:
         arr = np.array(img.convert("RGB"))
-
-        # Convert to grayscale for processing
         gray = cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY)
         h, w = gray.shape
 
-        # Adaptive thresholding on the whole image
         thr = max(int(gray.mean()) - self.threshold_offset, 0)
         bg_candidate = (gray < thr).astype(np.uint8)
 
-        # Flood-fill from the top line only
         flood = np.zeros((h + 2, w + 2), dtype=np.uint8)
         tmp = bg_candidate.copy()
         for col in range(w):
@@ -40,12 +36,8 @@ class RemoveTopBackgroundRobust:
                 cv2.floodFill(tmp, flood, seedPoint=(col, 0), newVal=1,
                               flags=cv2.FLOODFILL_MASK_ONLY)
 
-        # Extract background mask (1 = background found by floodfill)
         bg = (flood[1:-1, 1:-1] == 1).astype(np.uint8)
-
-        # Create final mask: 1 = keep (foreground), 0 = remove (background)
         mask = 1 - bg
-
         arr_fg = arr * mask[..., None]
 
         return Image.fromarray(arr_fg)
@@ -64,15 +56,12 @@ def build_image_path(row, root_dir):
 
 
 def prepare_metadata(df):
-    """
-    Applies the logic to generate patient_ids and clean condition labels.
-    """
+    """Generate patient_id and clean condition labels."""
     print(" -> Generating metadata (Patient IDs, Clean Conditions)...")
 
-    # 1. Ensure Disease is string
     df["label_disease"] = df["disease"].astype(str)
 
-    # 2. Process Conditions (Keep only those with >= 30 samples)
+    # Keep only conditions with >= 30 samples; everything else becomes IGNORE.
     cond_counts = df["condition"].value_counts()
     valid_conditions = cond_counts[cond_counts >= 30].index
 
@@ -85,7 +74,6 @@ def prepare_metadata(df):
 
     df["label_condition_raw"] = df.apply(make_label_condition, axis=1)
 
-    # 3. Process Patient IDs
     if "patient_id" in df.columns:
         df["patient_id"] = df["patient_id"].astype(str)
         df["patient_id"] = df["patient_id"].fillna("")

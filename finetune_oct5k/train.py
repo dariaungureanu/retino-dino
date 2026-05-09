@@ -1,8 +1,8 @@
 """
-OCT5k Fine-Tuning — Multi-label biomarker detection (9 classes).
-=================================================================
+OCT5k Fine-Tuning - Multi-label biomarker detection (9 classes).
+
 Same pipeline as Corina but with 9 biomarkers and patient-based splitting.
-Bounding boxes NOT used for training — only image-level labels.
+Bounding boxes are NOT used for training: only image-level labels.
 
 Usage:
 
@@ -197,7 +197,7 @@ def evaluate_test(model, loader, criterion, device, biomarkers, out_dir):
     for j in range(len(biomarkers), len(axes)):
         axes[j].set_visible(False)
 
-    fig.suptitle("OCT5k — Per-Biomarker Confusion Matrices", fontsize=14, fontweight="bold")
+    fig.suptitle("OCT5k - Per-Biomarker Confusion Matrices", fontsize=14, fontweight="bold")
     plt.tight_layout()
     cm_path = os.path.join(out_dir, "confusion_matrices.png")
     fig.savefig(cm_path, dpi=200, bbox_inches="tight")
@@ -288,7 +288,7 @@ def main():
     best_epoch = 0
 
     print(f"\n{'=' * 60}")
-    print(f"  TRAINING — {args.epochs} epochs, {num_labels} biomarkers")
+    print(f"  TRAINING - {args.epochs} epochs, {num_labels} biomarkers")
     print(f"{'=' * 60}\n")
 
     for epoch in range(1, args.epochs + 1):
@@ -306,9 +306,9 @@ def main():
         lr = optimizer.param_groups[0]["lr"]
 
         print(f"Epoch {epoch:02d}/{args.epochs} ({elapsed:.0f}s) lr={lr:.2e}")
-        print(f"  Train │ loss={t_loss:.4f}  F1_macro={t_met['f1_macro']:.4f}  "
+        print(f"  Train  loss={t_loss:.4f}  F1_macro={t_met['f1_macro']:.4f}  "
               f"AUC_macro={t_met['auc_macro']:.4f}")
-        print(f"  Val   │ loss={v_loss:.4f}  F1_macro={v_met['f1_macro']:.4f}  "
+        print(f"  Val    loss={v_loss:.4f}  F1_macro={v_met['f1_macro']:.4f}  "
               f"AUC_macro={v_met['auc_macro']:.4f}  "
               f"(best_f1={best_val_f1:.4f})")
 
@@ -340,7 +340,7 @@ def main():
                 "num_labels": num_labels,
                 "biomarkers": active_biomarkers,
             }, save_path)
-            print(f"  New best! Saved → {save_path}")
+            print(f"  New best! Saved -> {save_path}")
         else:
             patience_counter += 1
             if patience_counter >= args.patience:

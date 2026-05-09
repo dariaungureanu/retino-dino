@@ -23,7 +23,7 @@ def load_backbone(arch, checkpoint, device):
     print(f"[MODEL] {arch}: {len(model_keys)} params")
 
     if checkpoint is None:
-        print(f"[MODEL] No checkpoint → ImageNet baseline")
+        print(f"[MODEL] No checkpoint -> ImageNet baseline")
         return model.to(device)
 
     if not os.path.isfile(checkpoint):
@@ -67,7 +67,6 @@ def load_backbone(arch, checkpoint, device):
                     clean[k[len(prefix):]] = v
                     break
 
-    # pos_embed interpolation
     if "pos_embed" in clean and "pos_embed" in model_keys:
         ckpt_pos = clean["pos_embed"]
         model_pos = model.state_dict()["pos_embed"]
@@ -97,11 +96,11 @@ def load_backbone(arch, checkpoint, device):
 
 class CorinaModel(nn.Module):
     """
-    Multi-label classifier: DINOv2 backbone → MLP → 4 sigmoid outputs.
+    Multi-label classifier: DINOv2 backbone -> MLP -> 4 sigmoid outputs.
 
-    Key difference from OCTDL/MMRDR: output is 4 INDEPENDENT binary
-    predictions (each can be 0 or 1), NOT mutually exclusive classes.
-    No softmax — sigmoid is applied inside BCEWithLogitsLoss.
+    Output is 4 INDEPENDENT binary predictions (each can be 0 or 1),
+    NOT mutually exclusive classes. No softmax: sigmoid is applied
+    inside BCEWithLogitsLoss.
     """
     EMBED_DIM = 384
     NUM_BLOCKS = 12
@@ -123,8 +122,8 @@ class CorinaModel(nn.Module):
                     if name.startswith("norm."):
                         param.requires_grad = True
 
-        # Single head with num_labels outputs (NOT num_classes)
-        # Each output is an independent logit → sigmoid → binary prediction
+        # Single head with num_labels outputs (NOT num_classes).
+        # Each output is an independent logit -> sigmoid -> binary prediction.
         self.head = nn.Sequential(
             nn.Linear(self.EMBED_DIM, head_hidden),
             nn.BatchNorm1d(head_hidden),
@@ -144,6 +143,7 @@ class CorinaModel(nn.Module):
         elif isinstance(features, tuple):
             features = features[0]
         return self.head(features)  # raw logits, sigmoid applied in loss
+
 
     def get_param_groups(self, lr_backbone, lr_heads, weight_decay):
         backbone_params, backbone_nodecay = [], []

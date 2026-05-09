@@ -1,11 +1,9 @@
 """
-Disease vs Condition GradCAM Comparison — OCTDL
+Disease vs Condition GradCAM comparison for OCTDL.
 
-For the SAME image, shows where the disease head looks vs where
-the condition head looks. Proves the model learned different
-spatial features for each task.
-
-Generates side-by-side: [Original] [Disease CAM] [Condition CAM]
+For the SAME image, shows where the disease head looks vs where the condition
+head looks - evidence that the model learned different spatial features for
+each task. Output: side-by-side [Original] [Disease CAM] [Condition CAM].
 
 Usage:
     python finetune_octdl/analyse_disease_vs_condition.py \
@@ -33,8 +31,6 @@ from dataset import (
 from model import OCTDLMultiTaskModel, load_backbone
 
 
-# ── GradCAM utilities ──────────────────────────────────────────
-
 class TaskHeadWrapper(nn.Module):
     """Output only one head's logits for GradCAM."""
     def __init__(self, model, head_index):
@@ -59,8 +55,7 @@ def denormalize(img_tensor):
     return np.clip(img, 0, 1)
 
 
-# ── Known disease-condition mappings ───────────────────────────
-# These are the clinically expected relationships
+# Clinically expected disease -> condition mappings
 DISEASE_CONDITION_MAP = {
     "AMD": ["drusen", "MNV", "MNV_suspected"],
     "DME": ["ME"],
@@ -245,7 +240,7 @@ def main():
             # Column 2: Disease head GradCAM
             axes[i, 1].imshow(vis_d)
             axes[i, 1].set_title(
-                f"Disease Head → {pred_disease_name}",
+                f"Disease Head -> {pred_disease_name}",
                 fontsize=10, fontweight="bold", color="#1565C0",
             )
             axes[i, 1].axis("off")
@@ -253,14 +248,14 @@ def main():
             # Column 3: Condition head GradCAM
             axes[i, 2].imshow(vis_c)
             axes[i, 2].set_title(
-                f"Condition Head → {pred_cond_name}",
+                f"Condition Head -> {pred_cond_name}",
                 fontsize=10, fontweight="bold", color="#C62828",
             )
             axes[i, 2].axis("off")
 
         expected_str = ", ".join(expected_conds) if expected_conds else "?"
         fig.suptitle(
-            f"Disease vs Condition Attention — {disease_name}\n"
+            f"Disease vs Condition Attention - {disease_name}\n"
             f"(Expected conditions: {expected_str})",
             fontsize=14, fontweight="bold", y=1.02,
         )

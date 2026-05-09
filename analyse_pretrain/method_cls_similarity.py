@@ -1,16 +1,5 @@
 """
-Method — CLS-Patch Cosine Similarity
-=======================================
-Purpose:
-    Measure how much each spatial patch contributes to the global [CLS]
-    representation. For each image, we compute the cosine similarity
-    between the normalized CLS token and every normalized patch token
-    from the last transformer layer.
-
-What this tells me:
-    - Which spatial regions drive the global image representation
-    - High similarity = that patch is "important" to the CLS summary
-    - For OCT: retinal tissue should light up; background should be dark
+CLS-patch cosine similarity at the last transformer layer.
 
 Usage:
     # Domain-adapted checkpoint
@@ -24,7 +13,7 @@ Usage:
         --img_size 518 --max_images 5 \
         --out_dir results/cls_similarity/domain_adapted
 
-    # Baseline (original ImageNet pretrained — no --checkpoint)
+    # Baseline (no --checkpoint -> ImageNet weights)
     python analyse_pretrain/method_cls_similarity \
         --arch dinov2_vits14 \
         --csv /home/student/Ungureanu_Daria/OCTDL_Cleaned/OCTDL_clean_metadata.csv \
@@ -69,10 +58,6 @@ from analyse_shared import (
 )
 
 
-# ──────────────────────────────────────────────────────────────
-# Feature extraction
-# ──────────────────────────────────────────────────────────────
-
 @torch.no_grad()
 def compute_cls_patch_similarity(
     model: torch.nn.Module, x: torch.Tensor
@@ -83,14 +68,6 @@ def compute_cls_patch_similarity(
     Uses forward_features() which returns normalized tokens from the
     last layer. Both CLS and patch tokens are L2-normalized before
     computing dot product (= cosine similarity).
-
-    Args:
-        model: DINOv2 backbone (from torch.hub)
-        x:     Input tensor [B, 3, H, W]
-
-    Returns:
-        Similarity map [B, N] where N = number of patches.
-        Values in [-1, 1], higher = patch more similar to CLS.
     """
     feats = model.forward_features(x)
 
@@ -108,26 +85,18 @@ def compute_cls_patch_similarity(
             f"  Available: {available}"
         )
 
-    cls_token = feats["x_norm_clstoken"]       # [B, D]
-    patch_tokens = feats["x_norm_patchtokens"]  # [B, N, D]
+    cls_token = feats["x_norm_clstoken"]
+    patch_tokens = feats["x_norm_patchtokens"]
 
-    # Both are already L2-normalized by DINOv2's head,
-    # but we normalize again to be safe (idempotent if already unit-norm)
-    cls_token = F.normalize(cls_token, dim=-1)          # [B, D]
-    patch_tokens = F.normalize(patch_tokens, dim=-1)    # [B, N, D]
+    cls_token = F.normalize(cls_token, dim=-1)
+    patch_tokens = F.normalize(patch_tokens, dim=-1)
 
-    # Cosine similarity = dot product of unit vectors
-    # [B, N, D] × [B, D, 1] -> [B, N, 1] -> [B, N]
     similarity = torch.bmm(
         patch_tokens, cls_token.unsqueeze(-1)
     ).squeeze(-1)  # [B, N]
 
     return similarity
 
-
-# ──────────────────────────────────────────────────────────────
-# Visualization
-# ──────────────────────────────────────────────────────────────
 
 def save_similarity_map(
     raw_img_tensor: torch.Tensor,
@@ -139,12 +108,7 @@ def save_similarity_map(
     grid_w: int,
     overlay_alpha: float = 0.45,
 ):
-    """
-    Save (input | heatmap | overlay) figure for one image.
 
-    Args:
-        similarity: 1D array of shape [N] with cosine similarities
-    """
     # Reshape to spatial grid
     sim_grid = similarity.reshape(grid_h, grid_w)
 
@@ -177,7 +141,7 @@ def save_similarity_map(
     fig, axes = plt.subplots(1, 3, figsize=(15, 4))
 
     axes[0].imshow(raw_np)
-    axes[0].set_title(f"Input — {label}")
+    axes[0].set_title(f"Input - {label}")
     axes[0].axis("off")
 
     axes[1].imshow(heat_rgb)
@@ -189,7 +153,7 @@ def save_similarity_map(
     axes[2].axis("off")
 
     fig.suptitle(
-        f"{image_name}  |  {grid_h}×{grid_w} patches  |  "
+        f"{image_name}  |  {grid_h}x{grid_w} patches  |  "
         f"sim range: [{sim_min:.3f}, {sim_max:.3f}]",
         fontsize=9, color="gray",
     )
@@ -201,10 +165,6 @@ def save_similarity_map(
 
     return {"mean": mean_sim, "std": std_sim, "min": float(sim_min), "max": float(sim_max)}
 
-
-# ──────────────────────────────────────────────────────────────
-# Main
-# ──────────────────────────────────────────────────────────────
 
 def main():
     ap = argparse.ArgumentParser(
@@ -219,7 +179,7 @@ def main():
     device = get_device()
     grid_side = validate_img_size(args.img_size)
 
-    # ── Data ──
+    # Data
     samples = build_samples(
         args.csv, args.image_root,
         args.split_col, args.split,
@@ -232,10 +192,10 @@ def main():
     ds = OCTDataset(samples, img_size=args.img_size)
     dl = DataLoader(ds, batch_size=1, shuffle=False, num_workers=2)
 
-    # ── Model ──
+    # Model
     model = load_model(args.arch, args.checkpoint, device)
 
-    # ── Process ──
+    # Process
     records: List[Dict] = []
     all_stats = []
 
@@ -268,7 +228,7 @@ def main():
             **stats,
         })
 
-    # ── Summary ──
+    # Summary
     if all_stats:
         avg_mean = np.mean([s["mean"] for s in all_stats])
         avg_std = np.mean([s["std"] for s in all_stats])

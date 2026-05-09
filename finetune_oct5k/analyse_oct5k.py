@@ -64,8 +64,7 @@ def load_model(model_path, device):
 
 def load_bboxes_for_image(bbox_df, image_csv_path):
     """
-    Get all bounding boxes for a specific image.
-    Returns dict: {biomarker_name: [(xmin, ymin, xmax, ymax), ...]}
+    Get all bounding boxes for a specific image
     """
     rows = bbox_df[bbox_df["image"] == image_csv_path]
     bboxes = {}
@@ -118,7 +117,7 @@ def plot_tsne(features, labels, active_biomarkers, out_path):
                     label=f"{combo} ({mask.sum()})", color=palette[i],
                     alpha=0.7, s=40, edgecolors="white", linewidths=0.3)
 
-    plt.title("t-SNE — OCT5k Biomarker Feature Space", fontsize=14, fontweight="bold")
+    plt.title("t-SNE - OCT5k Biomarker Feature Space", fontsize=14, fontweight="bold")
     plt.legend(bbox_to_anchor=(1.02, 1), loc="upper left", fontsize=7, title="Biomarkers")
     plt.tight_layout()
     plt.savefig(out_path, dpi=200, bbox_inches="tight")
@@ -163,15 +162,13 @@ def compute_heatmap_bbox_iou(cam_map, bboxes, orig_w, orig_h, cam_threshold=0.5)
     if not bboxes:
         return 0.0
 
-    # Threshold heatmap to binary mask
     cam_h, cam_w = cam_map.shape
     cam_binary = (cam_map >= cam_threshold).astype(np.float32)
 
-    # Create bbox mask scaled to cam resolution
     bbox_mask = np.zeros((cam_h, cam_w), dtype=np.float32)
 
-    sx = cam_w / orig_w   # scale factor x
-    sy = cam_h / orig_h   # scale factor y
+    sx = cam_w / orig_w
+    sy = cam_h / orig_h
 
     for (xmin, ymin, xmax, ymax) in bboxes:
         x1 = max(0, int(xmin * sx))
@@ -180,7 +177,6 @@ def compute_heatmap_bbox_iou(cam_map, bboxes, orig_w, orig_h, cam_threshold=0.5)
         y2 = min(cam_h, int(ymax * sy))
         bbox_mask[y1:y2, x1:x2] = 1.0
 
-    # Compute IoU
     intersection = (cam_binary * bbox_mask).sum()
     union = ((cam_binary + bbox_mask) > 0).sum()
 
@@ -212,8 +208,6 @@ def generate_gradcam_with_bbox(
 ):
     """
     GradCAM for one biomarker with expert bounding box overlay + IoU score.
-    Each row: [Original + BBox] [GradCAM heatmap] [GradCAM + BBox + IoU]
-    Returns list of IoU scores for summary.
     """
     try:
         from pytorch_grad_cam import GradCAM
@@ -247,38 +241,31 @@ def generate_gradcam_with_bbox(
         img_input = img_tensor.unsqueeze(0).to(device)
         rgb_img = denormalize(img_input)
 
-        # Get prediction
         with torch.no_grad():
             logits = model(img_input)
             prob = torch.sigmoid(logits[0, biomarker_idx]).item()
 
         true_val = "ok" if true_labels[biomarker_idx] == 1 else "no"
 
-        # GradCAM
         cam_map = cam(input_tensor=img_input,
                       targets=[ClassifierOutputTarget(0)])[0]
         vis_cam = show_cam_on_image(rgb_img, cam_map, use_rgb=True)
 
-        # Get bounding boxes and original image size
         row = test_df.iloc[idx]
         image_csv = row["image_csv"]
         bboxes = load_bboxes_for_image(bbox_df, image_csv)
         biomarker_bboxes = bboxes.get(biomarker_name, [])
 
-        # Read original image size ONCE
         orig_img = Image.open(os.path.join(dataset.root_dir, row["image"]))
         ow, oh = orig_img.size  # width, height
 
-        # Compute IoU
         iou = compute_heatmap_bbox_iou(cam_map, biomarker_bboxes, ow, oh)
         all_ious.append(iou)
 
-        # Scale factors for drawing bboxes on 224x224
         cam_h, cam_w = rgb_img.shape[:2]
         sx = cam_w / ow
         sy = cam_h / oh
 
-        # Column 1: Original with bounding boxes
         axes[i, 0].imshow(rgb_img)
         for (xmin, ymin, xmax, ymax) in biomarker_bboxes:
             rect = patches.Rectangle(
@@ -290,12 +277,10 @@ def generate_gradcam_with_bbox(
                               f"BBoxes: {len(biomarker_bboxes)}", fontsize=9)
         axes[i, 0].axis("off")
 
-        # Column 2: GradCAM heatmap
         axes[i, 1].imshow(vis_cam)
-        axes[i, 1].set_title(f"GradCAM → {SHORT_NAMES[biomarker_name]}", fontsize=9)
+        axes[i, 1].set_title(f"GradCAM -> {SHORT_NAMES[biomarker_name]}", fontsize=9)
         axes[i, 1].axis("off")
 
-        # Column 3: GradCAM with bbox overlay + IoU
         axes[i, 2].imshow(vis_cam)
         for (xmin, ymin, xmax, ymax) in biomarker_bboxes:
             rect = patches.Rectangle(
@@ -314,7 +299,6 @@ def generate_gradcam_with_bbox(
     plt.close(fig)
     print(f"[SAVED] {save_path}")
 
-    # Print IoU summary for this biomarker
     if all_ious:
         mean_iou = np.mean(all_ious)
         print(f"  {SHORT_NAMES[biomarker_name]} IoU: mean={mean_iou:.3f}, "
@@ -361,7 +345,6 @@ def main():
 
     model, config, active_biomarkers = load_model(args.model_path, device)
 
-    # Load data
     _, _, test_df, _ = load_oct5k_splits(
         args.csv, args.data_path,
         drop_rare=config.get("drop_rare", 15),
@@ -371,24 +354,22 @@ def main():
     test_loader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False,
                              num_workers=args.num_workers, pin_memory=True)
 
-    # Load bounding boxes
     bbox_df = pd.read_csv(args.bbox_csv)
     print(f"[BBOX] Loaded {len(bbox_df)} bounding boxes")
 
-    # ── t-SNE ──────────────────────────────────────────────────
+    # t-SNE
     if not args.skip_tsne:
         features, labels = extract_features(model, test_loader, device)
         plot_tsne(features, labels, active_biomarkers,
                   os.path.join(args.out_dir, "tsne_oct5k.png"))
 
-    # ── GradCAM with bbox validation ──────────────────────────
+    # GradCAM with bbox validation
     if not args.skip_gradcam:
         probs, labels, idx = collect_predictions(model, test_loader, device, active_biomarkers)
 
         all_iou_results = {}
 
         for j, bm in enumerate(active_biomarkers):
-            # Correct detections with bbox overlay
             correct = select_samples(probs, labels, idx,
                                      biomarker_idx=j, correct=True, topk=args.topk)
             ious_correct = generate_gradcam_with_bbox(
@@ -397,10 +378,9 @@ def main():
                 active_biomarkers=active_biomarkers,
                 save_path=os.path.join(args.out_dir, f"gradcam_correct_{SHORT_NAMES[bm]}.png"),
                 device=device,
-                title=f"GradCAM + BBox — Correct {SHORT_NAMES[bm]} Detections",
+                title=f"GradCAM + BBox - Correct {SHORT_NAMES[bm]} Detections",
             )
 
-            # Errors
             errors = select_samples(probs, labels, idx,
                                     biomarker_idx=j, correct=False, topk=args.topk)
             ious_errors = generate_gradcam_with_bbox(
@@ -409,7 +389,7 @@ def main():
                 active_biomarkers=active_biomarkers,
                 save_path=os.path.join(args.out_dir, f"gradcam_errors_{SHORT_NAMES[bm]}.png"),
                 device=device,
-                title=f"GradCAM + BBox — {SHORT_NAMES[bm]} Errors",
+                title=f"GradCAM + BBox - {SHORT_NAMES[bm]} Errors",
             )
 
             if ious_correct:
@@ -417,7 +397,6 @@ def main():
             if ious_errors:
                 all_iou_results[f"{SHORT_NAMES[bm]}_errors"] = np.mean(ious_errors)
 
-        # ── IoU Summary ────────────────────────────────────────
         print(f"\n{'='*60}")
         print(f"  GRADCAM-BBOX IoU SUMMARY")
         print(f"{'='*60}")
@@ -430,7 +409,6 @@ def main():
                 print(f"  {'Mean (correct)':>20}: IoU = {np.mean(correct_only):.3f}")
             print(f"  {'Overall Mean':>20}: IoU = {overall_mean:.3f}")
 
-        # Save IoU results
         iou_path = os.path.join(args.out_dir, "iou_results.json")
         import json
         with open(iou_path, "w") as f:

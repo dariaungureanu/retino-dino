@@ -1,10 +1,6 @@
 """
-Multi-Task DINOv2 Model for OCTDL
-
-Architecture:
-    DINOv2 ViT-S/14 backbone (384-dim, 12 blocks)
-    ├── Head_Disease  → 7 classes
-    └── Head_Condition → 8 classes
+Multi-task DINOv2 model for OCTDL: ViT-S/14 backbone (384-dim, 12 blocks)
+plus two classification heads (disease, 7 classes; condition, 8 classes).
 """
 
 import os
@@ -21,26 +17,22 @@ def load_backbone(
     checkpoint: Optional[str],
     device: torch.device,
 ) -> nn.Module:
-    """
-    Load DINOv2 backbone from torch.hub, optionally overwriting weights
-    from a continual-pretraining checkpoint.
-    """
+    """Load DINOv2 backbone from torch.hub; optionally overwrite weights from
+    a continual-pretraining checkpoint."""
     print(f"\n{'='*60}")
     print(f"  MODEL LOADING DIAGNOSTICS")
     print(f"{'='*60}")
 
-    # Step 1 — Load hub architecture with ImageNet weights
     print(f"[MODEL] Architecture: {arch}")
     model = torch.hub.load("facebookresearch/dinov2", arch)
     model_keys = set(model.state_dict().keys())
     print(f"[MODEL] Hub model: {len(model_keys)} parameter tensors")
 
     if checkpoint is None:
-        print(f"[MODEL] No checkpoint → ImageNet baseline")
+        print(f"[MODEL] No checkpoint -> ImageNet baseline")
         print(f"{'='*60}\n")
         return model.to(device)
 
-    # Step 2 — Load checkpoint file
     if not os.path.isfile(checkpoint):
         print(f"[FATAL] Checkpoint not found: {checkpoint}")
         sys.exit(1)
@@ -49,7 +41,6 @@ def load_backbone(
     ckpt = torch.load(checkpoint, map_location="cpu")
     print(f"[MODEL] Top-level keys: {list(ckpt.keys())}")
 
-    # Step 3 — Extract the right sub-dict
     if "model" in ckpt:
         st = ckpt["model"]
         print(f"[MODEL] Using 'model' sub-dict ({len(st)} keys)")
@@ -63,10 +54,8 @@ def load_backbone(
         st = ckpt
         print(f"[MODEL] No recognized sub-dict, using top-level")
 
-    # Show first keys for debugging
     print(f"[MODEL] Raw keys (first 5): {list(st.keys())[:5]}")
 
-    # Step 4 — Try prefix patterns to find teacher backbone weights
     PREFIX_PATTERNS = [
         "teacher.backbone.",
         "backbone.",
@@ -96,7 +85,6 @@ def load_backbone(
                 matched_prefix = prefix
                 break
 
-    # Fallback: force extraction
     if not clean:
         print(f"[MODEL] No prefix matched cleanly. Forcing teacher.backbone.*")
         for k, v in st.items():
@@ -109,7 +97,8 @@ def load_backbone(
     print(f"[MODEL] Matched prefix: '{matched_prefix}'")
     print(f"[MODEL] Cleaned keys: {len(clean)} (first 3: {list(clean.keys())[:3]})")
 
-    # Step 5 — Interpolate pos_embed if resolution mismatch
+    # Interpolate pos_embed when the SSL pretraining resolution differs from
+    # the fine-tuning resolution; without this load_state_dict raises on shape.
     if "pos_embed" in clean and "pos_embed" in model_keys:
         ckpt_pos  = clean["pos_embed"]
         model_pos = model.state_dict()["pos_embed"]
@@ -127,7 +116,7 @@ def load_backbone(
             g_model = int(n_model ** 0.5)
             d       = patch_pos.shape[-1]
 
-            print(f"[MODEL] Interpolating: {g_ckpt}×{g_ckpt} → {g_model}×{g_model}")
+            print(f"[MODEL] Interpolating: {g_ckpt}x{g_ckpt} -> {g_model}x{g_model}")
 
             patch_pos = patch_pos.reshape(1, g_ckpt, g_ckpt, d).permute(0, 3, 1, 2)
             patch_pos = F.interpolate(
@@ -138,7 +127,6 @@ def load_backbone(
             clean["pos_embed"] = torch.cat([cls_pos, patch_pos], dim=1)
             print(f"[MODEL] pos_embed interpolated: {list(clean['pos_embed'].shape)}")
 
-    # Step 6 — Load weights
     result = model.load_state_dict(clean, strict=False)
     loaded = len(model_keys) - len(result.missing_keys)
 
@@ -161,17 +149,14 @@ def load_backbone(
 
 
 class OCTDLMultiTaskModel(nn.Module):
-    """
-    DINOv2 backbone + dual classification heads.
+    """DINOv2 backbone + dual classification heads.
 
     Freeze strategy for ViT-S/14 (12 blocks):
-        - freeze_backbone=True, unfreeze_last_n=0  → linear probing
-        - freeze_backbone=True, unfreeze_last_n=2  → partial unfreeze
-        - freeze_backbone=False                     → full fine-tune
-
+        freeze_backbone=True,  unfreeze_last_n=0 -> linear probing
+        freeze_backbone=True,  unfreeze_last_n=2 -> partial unfreeze
+        freeze_backbone=False                    -> full fine-tune
     """
 
-    # ViT-S/14 config
     EMBED_DIM = 384
     NUM_BLOCKS = 12
 
@@ -190,11 +175,9 @@ class OCTDLMultiTaskModel(nn.Module):
         self.freeze_backbone = freeze_backbone
         self.unfreeze_last_n = unfreeze_last_n
 
-        # Apply freeze strategy
         if freeze_backbone:
             self._apply_freeze(unfreeze_last_n)
 
-        # Classification heads
         self.head_disease = self._build_head(self.EMBED_DIM, head_hidden, num_diseases, head_dropout)
         self.head_condition = self._build_head(self.EMBED_DIM, head_hidden, num_conditions, head_dropout)
 
@@ -210,12 +193,8 @@ class OCTDLMultiTaskModel(nn.Module):
         )
 
     def _apply_freeze(self, unfreeze_last_n: int):
-        """
-        Freeze entire backbone, then selectively unfreeze:
-            - Last N transformer blocks
-            - Final LayerNorm (norm.)
-        """
-        # Freeze everything first
+        """Freeze the backbone, then unfreeze the last N blocks and the final
+        norm layer (norm.)."""
         for param in self.backbone.parameters():
             param.requires_grad = False
 
@@ -223,20 +202,17 @@ class OCTDLMultiTaskModel(nn.Module):
             print(f"[MODEL] Backbone fully frozen (linear probing)")
             return
 
-        # Unfreeze last N blocks
         unfreeze_start = self.NUM_BLOCKS - unfreeze_last_n
         unfrozen_names = []
 
         for name, param in self.backbone.named_parameters():
             should_unfreeze = False
-
-            # Check if parameter belongs to one of the last N blocks
             for block_idx in range(unfreeze_start, self.NUM_BLOCKS):
                 if f"blocks.{block_idx}." in name:
                     should_unfreeze = True
                     break
-
-            # Always unfreeze the final norm layer
+            # The final norm runs on every forward pass; train it whenever any
+            # block above it is being trained.
             if name.startswith("norm."):
                 should_unfreeze = True
 
@@ -244,7 +220,7 @@ class OCTDLMultiTaskModel(nn.Module):
                 param.requires_grad = True
                 unfrozen_names.append(name)
 
-        print(f"[MODEL] Unfrozen blocks: {unfreeze_start}–{self.NUM_BLOCKS - 1} "
+        print(f"[MODEL] Unfrozen blocks: {unfreeze_start}-{self.NUM_BLOCKS - 1} "
               f"+ norm ({len(unfrozen_names)} params)")
 
     def _print_param_summary(self):
@@ -256,11 +232,6 @@ class OCTDLMultiTaskModel(nn.Module):
               f"{frozen:,} frozen")
 
     def forward(self, x):
-        """
-        Forward pass. Handles different DINOv2 output formats:
-        - dict with 'x_norm_clstoken'
-        - raw tensor
-        """
         features = self.backbone(x)
 
         if isinstance(features, dict):
@@ -274,17 +245,13 @@ class OCTDLMultiTaskModel(nn.Module):
         return logits_disease, logits_condition
 
     def get_param_groups(self, lr_backbone: float, lr_heads: float, weight_decay: float):
-        """
-        Differential learning rates
-            - Backbone unfrozen params: low LR (e.g., 1e-5)
-            - Classification heads: higher LR (e.g., 5e-4)
-        """
+        """Build optimizer param groups with differential LR (low for backbone,
+        higher for heads) and no decay on bias / norm / bn parameters."""
         backbone_params = []
         backbone_nodecay = []
         head_params = []
         head_nodecay = []
 
-        # Separate backbone vs head, decay vs no-decay
         for name, param in self.named_parameters():
             if not param.requires_grad:
                 continue
@@ -310,7 +277,6 @@ class OCTDLMultiTaskModel(nn.Module):
             {"params": head_nodecay,      "lr": lr_heads,    "weight_decay": 0.0},
         ]
 
-        # Filter out empty groups
         groups = [g for g in groups if len(g["params"]) > 0]
 
         for g in groups:

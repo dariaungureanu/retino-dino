@@ -16,7 +16,6 @@ class DINO_Dataset(Dataset):
             self.image_paths.extend(glob.glob(os.path.join(root_dir, '**', ext), recursive=True))
         print(f"[SSL DINO Dataset] Found {len(self.image_paths)} images.")
 
-        #global crop 1
         self.global_transform1 = transforms.Compose([
             transforms.RandomResizedCrop(global_size, scale=(0.4, 1.0)),
             transforms.RandomHorizontalFlip(),
@@ -27,7 +26,7 @@ class DINO_Dataset(Dataset):
             transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
 
-        #global crop 2 - diff augmentation
+        # global_transform2 uses gaussian blur instead of color jitter
         self.global_transform2 = transforms.Compose([
             transforms.RandomResizedCrop(global_size, scale=(0.4, 1.0)),
             transforms.RandomHorizontalFlip(),
@@ -38,7 +37,6 @@ class DINO_Dataset(Dataset):
             transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
         ])
 
-        #local crop
         self.local_transform = transforms.Compose([
             transforms.RandomResizedCrop(local_size, scale=(0.05, 0.4)),
             transforms.RandomHorizontalFlip(),
@@ -56,11 +54,9 @@ class DINO_Dataset(Dataset):
         img = Image.open(self.image_paths[idx]).convert("RGB")
 
         crops = []
-        # 2 global crops
         crops.append(self.global_transform1(img))
         crops.append(self.global_transform2(img))
 
-        # N local crops
         for _ in range(self.local_crops_number):
             crops.append(self.local_transform(img))
 

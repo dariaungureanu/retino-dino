@@ -4,10 +4,6 @@ import os
 
 
 def load_custom_backbone(checkpoint_path):
-    """
-    Load DINOv2 architecture from Torch Hub and apply pretrained weights.
-    The function handles various checkpoint formats and removes module prefixes.
-    """
     print(f"Loading backbone architecture from Torch Hub...")
 
     backbone = torch.hub.load('facebookresearch/dinov2', 'dinov2_vitl14')

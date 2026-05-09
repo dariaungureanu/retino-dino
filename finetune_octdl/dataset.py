@@ -56,17 +56,16 @@ class OCTDLMultiTaskDataset(Dataset):
     def __getitem__(self, idx):
         row = self.df.iloc[idx]
 
-        # Path: root / disease_folder / filename
         img_path = os.path.join(self.root_dir, row["disease"], row["file_name"])
         image = Image.open(img_path).convert("RGB")
 
         if self.transform:
             image = self.transform(image)
 
-        # Disease label — always present
         label_disease = self.disease_map[str(row["label_disease"])]
 
-        # Condition label — may be missing / filtered
+        # Condition labels are optional in the CSV; missing/filtered rows get
+        # IGNORE_INDEX so the loss masks them.
         cond_str = str(row["label_condition_raw"])
         label_condition = self.condition_map.get(cond_str, IGNORE_INDEX)
 
@@ -74,21 +73,13 @@ class OCTDLMultiTaskDataset(Dataset):
 
 
 def get_data_splits(csv_path, test_size=0.2, val_size=0.1, random_state=42):
-    """
-    Patient-based stratified split → train / val / test DataFrames.
-
-    Returns:
-        train_df, val_df, test_df, disease_map, condition_map
-    """
-
+    """Patient-stratified split into train/val/test DataFrames."""
     df = pd.read_csv(csv_path)
     print(f"[DATA] Loaded {len(df)} rows from {csv_path}")
 
-    # Build label maps (sorted for reproducibility)
     unique_diseases = sorted(df["label_disease"].astype(str).unique())
     disease_map = {name: i for i, name in enumerate(unique_diseases)}
 
-    # Only conditions with enough samples (already filtered in OCTDL_Cleaned)
     valid_conds = df.loc[
         df["label_condition_raw"] != "IGNORE", "label_condition_raw"
     ].unique()
@@ -97,7 +88,6 @@ def get_data_splits(csv_path, test_size=0.2, val_size=0.1, random_state=42):
     print(f"[DATA] Disease classes ({len(disease_map)}): {disease_map}")
     print(f"[DATA] Condition classes ({len(condition_map)}): {condition_map}")
 
-    # Split at patient level, stratify on disease
     patients = df[["patient_id", "label_disease"]].drop_duplicates()
     total_held_out = test_size + val_size
 
@@ -129,7 +119,6 @@ def compute_class_weights(df, label_col, label_map):
     num_classes = len(label_map)
     inv_map = {v: k for k, v in label_map.items()}
 
-    # Count samples per mapped class
     mapped = df[label_col].astype(str).map(label_map)
     counts = mapped.dropna().astype(int).value_counts()
     total = counts.sum()

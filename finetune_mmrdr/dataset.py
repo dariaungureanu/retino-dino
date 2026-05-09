@@ -1,10 +1,10 @@
 """
-MMRDR-OCT Dataset — 3-class DME severity grading.
+MMRDR-OCT Dataset - 3-class DME severity grading.
 
-Classes: 0=No DME, 1=NCI-DME, 2=CI-DME
+Classes: 0=No DME, 1=NCI-DME, 2=CI-DME.
 Train/test split is predefined in the CSV (tr* = train, ts* = test).
-Validation is carved from training set for early stopping.
-No preprocessing applied — images used as-is for comparability with
+Validation is carved from the training set for early stopping.
+No preprocessing applied: images are used as-is for comparability with
 the paper's RETFound/ResNet/ViT benchmarks.
 """
 
@@ -24,9 +24,10 @@ CLASS_NAMES = {0: "No_DME", 1: "NCI_DME", 2: "CI_DME"}
 
 def get_train_transform(img_size: int = 224):
     return transforms.Compose([
-        transforms.RandomResizedCrop(img_size, scale=(0.8, 1.0)),  # mild crop
+        transforms.RandomResizedCrop(img_size, scale=(0.8, 1.0)),
         transforms.RandomHorizontalFlip(),
-        transforms.ColorJitter(brightness=0.2, contrast=0.2),  # mild, no hue/sat
+        # Brightness/contrast only; no hue/saturation jitter on grayscale OCT.
+        transforms.ColorJitter(brightness=0.2, contrast=0.2),
         transforms.ToTensor(),
         transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
     ])
@@ -41,10 +42,7 @@ def get_eval_transform(img_size: int = 224):
 
 
 class MMRDRDataset(Dataset):
-    """
-    Simple single-task dataset: returns (image, grade_label).
-    grade: 0=No DME, 1=NCI-DME, 2=CI-DME
-    """
+    """Single-task dataset: returns (image, grade_label) where grade in {0,1,2}."""
     def __init__(self, dataframe, root_dir, transform):
         self.df = dataframe.reset_index(drop=True)
         self.root_dir = root_dir
@@ -70,14 +68,12 @@ def load_mmrdr_splits(csv_path, root_dir, val_size=0.1, random_state=42):
     Load MMRDR-OCT CSV and split into train/val/test.
 
     Train/test is predefined by filename prefix (tr* = train, ts* = test).
-    Validation is carved from training set (stratified on grade).
-
-    Returns: train_df, val_df, test_df, num_classes
+    Validation is carved from the training set (stratified on grade).
     """
     df = pd.read_csv(csv_path)
     print(f"[DATA] Loaded {len(df)} rows from {csv_path}")
 
-    # Split by filename prefix
+    # Filename prefix encodes the predefined split.
     df["split"] = df["image"].apply(lambda x: "train" if os.path.basename(x).startswith("tr") else "test")
 
     train_full = df[df["split"] == "train"].copy()
@@ -85,13 +81,11 @@ def load_mmrdr_splits(csv_path, root_dir, val_size=0.1, random_state=42):
 
     print(f"[DATA] Predefined split: {len(train_full)} train, {len(test_df)} test")
 
-    # Class distribution
     for split_name, split_df in [("Train", train_full), ("Test", test_df)]:
         dist = split_df["grade"].value_counts().sort_index()
         print(f"[DATA] {split_name} distribution: " +
               ", ".join([f"Grade {g}({CLASS_NAMES[g]})={c}" for g, c in dist.items()]))
 
-    # Carve validation from training (stratified on grade)
     train_df, val_df = train_test_split(
         train_full,
         test_size=val_size,
@@ -101,7 +95,6 @@ def load_mmrdr_splits(csv_path, root_dir, val_size=0.1, random_state=42):
 
     print(f"[DATA] After val split: {len(train_df)} train, {len(val_df)} val, {len(test_df)} test")
 
-    # Verify all images exist
     for name, split_df in [("train", train_df), ("val", val_df), ("test", test_df)]:
         missing = sum(1 for _, r in split_df.iterrows()
                       if not os.path.isfile(os.path.join(root_dir, r["image"])))

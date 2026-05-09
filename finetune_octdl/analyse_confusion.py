@@ -21,7 +21,7 @@ import os
 import numpy as np
 import torch
 import matplotlib
-matplotlib.use("Agg")  # non-interactive backend (no display needed)
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix, classification_report
@@ -35,10 +35,6 @@ from model import OCTDLMultiTaskModel, load_backbone
 
 
 def load_model_from_checkpoint(model_path, device):
-    """
-    Load a fine-tuned model from a saved checkpoint.
-    Returns (model, checkpoint_dict).
-    """
     print(f"[INFO] Loading checkpoint: {model_path}")
     ckpt = torch.load(model_path, map_location=device)
 
@@ -92,17 +88,9 @@ def plot_confusion_matrix(
     y_true, y_pred, class_names, title, save_path,
     figsize=None, normalize=False,
 ):
-    """
-    Plot and save a confusion matrix as a high-quality image.
-
-    Args:
-        normalize: If True, show percentages per row (recall).
-                   If False, show raw counts.
-    """
     cm = confusion_matrix(y_true, y_pred)
 
     if normalize:
-        # Normalize per row (per true class) → shows recall per class
         row_sums = cm.sum(axis=1, keepdims=True)
         cm_plot = np.where(row_sums > 0, cm / row_sums * 100, 0)
         fmt = ".1f"
@@ -194,26 +182,26 @@ def main():
     # Get predictions
     preds_d, labels_d, preds_c, labels_c = get_predictions(model, test_loader, device)
 
-    # ── Disease confusion matrices ─────────────────────────────
+    # Disease confusion matrices
     inv_disease = {v: k for k, v in disease_map.items()}
     disease_names = [inv_disease[i] for i in range(len(disease_map))]
 
     # Raw counts
     plot_confusion_matrix(
         labels_d, preds_d, disease_names,
-        title="Disease Classification — Confusion Matrix (Counts)",
+        title="Disease Classification - Confusion Matrix (Counts)",
         save_path=os.path.join(args.out_dir, "disease_confusion_counts.png"),
     )
 
     # Normalized (recall %)
     plot_confusion_matrix(
         labels_d, preds_d, disease_names,
-        title="Disease Classification — Confusion Matrix (Recall %)",
+        title="Disease Classification - Confusion Matrix (Recall %)",
         save_path=os.path.join(args.out_dir, "disease_confusion_normalized.png"),
         normalize=True,
     )
 
-    # ── Condition confusion matrices ───────────────────────────
+    # Condition confusion matrices
     cond_mask = labels_c != IGNORE_INDEX
     if cond_mask.sum() > 0:
         valid_preds_c = preds_c[cond_mask]
@@ -225,21 +213,21 @@ def main():
         # Raw counts
         plot_confusion_matrix(
             valid_labels_c, valid_preds_c, condition_names,
-            title="Condition Classification — Confusion Matrix (Counts)",
+            title="Condition Classification - Confusion Matrix (Counts)",
             save_path=os.path.join(args.out_dir, "condition_confusion_counts.png"),
         )
 
         # Normalized (recall %)
         plot_confusion_matrix(
             valid_labels_c, valid_preds_c, condition_names,
-            title="Condition Classification — Confusion Matrix (Recall %)",
+            title="Condition Classification - Confusion Matrix (Recall %)",
             save_path=os.path.join(args.out_dir, "condition_confusion_normalized.png"),
             normalize=True,
         )
     else:
-        print("[WARN] No valid condition labels in test set — skipping condition matrix")
+        print("[WARN] No valid condition labels in test set - skipping condition matrix")
 
-    # ── Print classification reports too ───────────────────────
+    # Classification reports
     print(f"\n{'='*60}")
     print(f"  DISEASE Report")
     print(f"{'='*60}")

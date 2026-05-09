@@ -1,5 +1,5 @@
 """
-MMRDR-OCT Fine-Tuning — 3-class DME severity grading.
+MMRDR-OCT Fine-Tuning - 3-class DME severity grading.
 
 Single-task version of the OCTDL pipeline.
 Metrics: Accuracy, Balanced Acc, Macro-F1, AUC-ROC, Cohen's Kappa
@@ -54,7 +54,7 @@ from dataset import (
 )
 from model import MMRDRModel, load_backbone
 
-# ── Defaults (same as OCTDL Run C) ────────────────────────────
+# Defaults match OCTDL Run C.
 ARCH = "dinov2_vits14"
 IMG_SIZE = 224
 BATCH_SIZE = 32
@@ -72,10 +72,7 @@ NUM_WORKERS = 4
 
 
 def compute_all_metrics(logits_or_probs, labels, num_classes):
-    """
-    Compute all metrics the paper uses:
-    accuracy, balanced_accuracy, macro_f1, auc_roc, kappa
-    """
+    """Compute accuracy, balanced_accuracy, macro_f1, auc_roc, kappa (paper's metric set)."""
     if isinstance(logits_or_probs, torch.Tensor):
         probs = torch.softmax(logits_or_probs, dim=1).cpu().numpy()
         preds = torch.argmax(logits_or_probs, dim=1).cpu().numpy()
@@ -89,12 +86,13 @@ def compute_all_metrics(logits_or_probs, labels, num_classes):
     macro_f1 = f1_score(labels, preds, average="macro", zero_division=0)
     kappa = cohen_kappa_score(labels, preds)
 
-    # AUC-ROC (one-vs-rest, macro averaged)
+    # AUC-ROC, one-vs-rest, macro averaged.
     try:
         labels_bin = label_binarize(labels, classes=list(range(num_classes)))
         auc_roc = roc_auc_score(labels_bin, probs, multi_class="ovr", average="macro")
     except ValueError:
-        auc_roc = 0.0  # edge case: only one class present in batch
+        # Edge case: only one class present in the batch.
+        auc_roc = 0.0
 
     return {
         "acc": acc,
@@ -107,7 +105,6 @@ def compute_all_metrics(logits_or_probs, labels, num_classes):
 
 def run_epoch(model, loader, criterion, device, num_classes,
               optimizer=None, scheduler=None, grad_clip=None):
-    """Single-task train/eval epoch."""
     is_train = optimizer is not None
     model.train() if is_train else model.eval()
 
@@ -146,7 +143,6 @@ def run_epoch(model, loader, criterion, device, num_classes,
 
 
 def evaluate_test(model, loader, criterion, device, num_classes, out_dir):
-    """Full test evaluation with reports + confusion matrix."""
     model.eval()
     all_logits, all_labels = [], []
 
@@ -166,13 +162,11 @@ def evaluate_test(model, loader, criterion, device, num_classes, out_dir):
     labels_np = cat_labels.cpu().numpy()
     class_names = [CLASS_NAMES[i] for i in range(num_classes)]
 
-    # Classification report
     print(f"\n{'=' * 60}")
     print(f"  DME Classification Report")
     print(f"{'=' * 60}")
     print(classification_report(labels_np, preds, target_names=class_names, zero_division=0))
 
-    # Confusion matrix
     cm = confusion_matrix(labels_np, preds)
     fig, ax = plt.subplots(figsize=(8, 6))
     sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
@@ -224,7 +218,6 @@ def main():
     print(f"[INFO] Device: {device}")
     os.makedirs(args.save_dir, exist_ok=True)
 
-    # ── Data ───────────────────────────────────────────────────
     train_df, val_df, test_df, num_classes = load_mmrdr_splits(
         args.csv, args.data_path, val_size=0.1,
     )
@@ -244,7 +237,6 @@ def main():
 
     print(f"[DATA] Batches: train={len(train_loader)}, val={len(val_loader)}, test={len(test_loader)}")
 
-    # ── Model ──────────────────────────────────────────────────
     backbone = load_backbone(args.arch, args.checkpoint, device)
     model = MMRDRModel(
         backbone=backbone,
@@ -255,7 +247,6 @@ def main():
         head_dropout=args.head_dropout,
     ).to(device)
 
-    # ── Optimizer ──────────────────────────────────────────────
     param_groups = model.get_param_groups(args.lr_backbone, args.lr_heads, args.weight_decay)
     optimizer = optim.AdamW(param_groups)
 
@@ -265,7 +256,6 @@ def main():
 
     criterion = nn.CrossEntropyLoss(weight=weights)
 
-    # ── WandB ──────────────────────────────────────────────────
     run_name = args.run_name or f"mmrdr_{args.arch}_unfreeze{args.unfreeze_last_n}"
     wandb.init(
         project="MMRDR-OCT-FineTune",
@@ -273,13 +263,12 @@ def main():
         config=vars(args),
     )
 
-    # ── Training ───────────────────────────────────────────────
     best_val_f1 = 0.0
     patience_counter = 0
     best_epoch = 0
 
     print(f"\n{'=' * 60}")
-    print(f"  TRAINING — {args.epochs} epochs, {num_classes} classes")
+    print(f"  TRAINING - {args.epochs} epochs, {num_classes} classes")
     print(f"{'=' * 60}\n")
 
     for epoch in range(1, args.epochs + 1):
@@ -297,9 +286,9 @@ def main():
         lr = optimizer.param_groups[0]["lr"]
 
         print(f"Epoch {epoch:02d}/{args.epochs} ({elapsed:.0f}s) lr={lr:.2e}")
-        print(f"  Train │ loss={t_loss:.4f}  F1={t_met['macro_f1']:.4f}  "
+        print(f"  Train  loss={t_loss:.4f}  F1={t_met['macro_f1']:.4f}  "
               f"AUC={t_met['auc_roc']:.4f}  Kappa={t_met['kappa']:.4f}")
-        print(f"  Val   │ loss={v_loss:.4f}  F1={v_met['macro_f1']:.4f}  "
+        print(f"  Val    loss={v_loss:.4f}  F1={v_met['macro_f1']:.4f}  "
               f"AUC={v_met['auc_roc']:.4f}  Kappa={v_met['kappa']:.4f}  "
               f"(best_f1={best_val_f1:.4f})")
 
@@ -327,14 +316,13 @@ def main():
                 "config": vars(args),
                 "num_classes": num_classes,
             }, save_path)
-            print(f" New best! Saved → {save_path}")
+            print(f" New best! Saved -> {save_path}")
         else:
             patience_counter += 1
             if patience_counter >= args.patience:
                 print(f"\n[EARLY STOP] Best: epoch {best_epoch}, F1={best_val_f1:.4f}")
                 break
 
-    # ── Test ───────────────────────────────────────────────────
     print(f"\n{'=' * 60}")
     print(f"  FINAL TEST (best checkpoint: epoch {best_epoch})")
     print(f"{'=' * 60}")
@@ -353,7 +341,6 @@ def main():
     print(f"  AUC-ROC:      {test_met['auc_roc']:.4f}")
     print(f"  Kappa:        {test_met['kappa']:.4f}")
 
-    # Save results JSON
     results = {
         "checkpoint": args.checkpoint or "ImageNet baseline",
         "best_epoch": best_epoch,

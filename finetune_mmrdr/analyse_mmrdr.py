@@ -1,13 +1,5 @@
 """
-MMRDR-OCT Explainability — t-SNE + GradCAM
-============================================
-Single-task version (3-class DME grading).
-
-Generates:
-  1. t-SNE of backbone features colored by DME grade
-  2. GradCAM on top-K correct predictions per class (implicit localization)
-  3. GradCAM on top-K errors (error analysis)
-  4. GradCAM NCI vs CI comparison (clinical question: does model distinguish location?)
+MMRDR-OCT Explainability - t-SNE + GradCAM (single-task, 3-class DME grading).
 
 Usage:
     python finetune_mmrdr/analyse_mmrdr.py \
@@ -93,7 +85,7 @@ def plot_tsne(features, labels, out_path, perplexity=30):
                     label=CLASS_NAMES[grade], color=colors[grade],
                     alpha=0.7, s=40, edgecolors="white", linewidths=0.3)
 
-    plt.title("t-SNE — DME Severity Feature Space", fontsize=14, fontweight="bold")
+    plt.title("t-SNE - DME Severity Feature Space", fontsize=14, fontweight="bold")
     plt.legend(fontsize=11, title="DME Grade")
     plt.xlabel("t-SNE 1")
     plt.ylabel("t-SNE 2")
@@ -104,7 +96,7 @@ def plot_tsne(features, labels, out_path, perplexity=30):
 
 
 def reshape_transform_vit(tensor):
-    """ViT output [B, tokens, C] → [B, C, H, W] for GradCAM."""
+    """ViT output [B, tokens, C] -> [B, C, H, W] for GradCAM."""
     result = tensor[:, 1:, :]  # drop CLS
     grid = int(np.sqrt(result.size(1)))
     result = result.reshape(tensor.size(0), grid, grid, tensor.size(2))
@@ -139,12 +131,7 @@ def collect_predictions(model, loader, device):
 
 def select_samples(y_true, y_pred, y_conf, indices, class_idx=None,
                    correct=False, topk=6):
-    """
-    Select top-K samples by confidence.
-    correct=True: most confident CORRECT predictions
-    correct=False: most confident WRONG predictions
-    class_idx: filter by true label (None = all classes)
-    """
+    """Top-K samples by confidence. correct toggles right vs wrong; class_idx filters by true label."""
     if correct:
         mask = y_true == y_pred
     else:
@@ -165,10 +152,7 @@ def select_samples(y_true, y_pred, y_conf, indices, class_idx=None,
 
 def generate_gradcam_grid(model, dataset, sample_indices, save_path,
                           device, title="GradCAM"):
-    """
-    Generate GradCAM for selected samples.
-    Each row: Original | CAM for Predicted | CAM for True
-    """
+    """GradCAM grid: each row is Original | CAM for Predicted | CAM for True."""
     try:
         from pytorch_grad_cam import GradCAM
         from pytorch_grad_cam.utils.image import show_cam_on_image
@@ -181,7 +165,6 @@ def generate_gradcam_grid(model, dataset, sample_indices, save_path,
         print(f"[SKIP] No samples for: {title}")
         return
 
-    # Enable gradients
     for p in model.backbone.parameters():
         p.requires_grad_(True)
 
@@ -223,11 +206,11 @@ def generate_gradcam_grid(model, dataset, sample_indices, save_path,
         axes[i, 0].axis("off")
 
         axes[i, 1].imshow(vis_pred)
-        axes[i, 1].set_title(f"CAM → Predicted: {pred_name}", fontsize=10)
+        axes[i, 1].set_title(f"CAM -> Predicted: {pred_name}", fontsize=10)
         axes[i, 1].axis("off")
 
         axes[i, 2].imshow(vis_true)
-        axes[i, 2].set_title(f"CAM → True: {true_name}", fontsize=10)
+        axes[i, 2].set_title(f"CAM -> True: {true_name}", fontsize=10)
         axes[i, 2].axis("off")
 
     fig.suptitle(title, fontsize=14, fontweight="bold", y=1.01)
@@ -236,10 +219,6 @@ def generate_gradcam_grid(model, dataset, sample_indices, save_path,
     plt.close(fig)
     print(f"[SAVED] {save_path}")
 
-
-# ═══════════════════════════════════════════════════════════════
-#  MAIN
-# ═══════════════════════════════════════════════════════════════
 
 def main():
     parser = argparse.ArgumentParser(description="MMRDR Explainability")
@@ -257,7 +236,6 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     os.makedirs(args.out_dir, exist_ok=True)
 
-    # Load model and data
     model, config, num_classes = load_model(args.model_path, device)
 
     _, _, test_df, _ = load_mmrdr_splits(args.csv, args.data_path)
@@ -266,20 +244,17 @@ def main():
     test_loader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False,
                              num_workers=args.num_workers, pin_memory=True)
 
-    # ── t-SNE ──────────────────────────────────────────────────
     if not args.skip_tsne:
         features, labels = extract_features(model, test_loader, device)
         plot_tsne(features, labels,
                   os.path.join(args.out_dir, "tsne_dme.png"))
 
-    # ── GradCAM ────────────────────────────────────────────────
     if not args.skip_gradcam:
         y_true, y_pred, y_conf, idx = collect_predictions(
             model, test_loader, device,
         )
 
-        # 1. CORRECT predictions — per class (implicit localization)
-        #    Shows: "model looks at the right structures when correct"
+        # Per-class CORRECT predictions (implicit localization).
         for grade in range(3):
             correct_samples = select_samples(
                 y_true, y_pred, y_conf, idx,
@@ -289,11 +264,10 @@ def main():
                 model, test_ds, correct_samples, device=device,
                 save_path=os.path.join(args.out_dir,
                                        f"gradcam_correct_{CLASS_NAMES[grade]}.png"),
-                title=f"GradCAM — Correct {CLASS_NAMES[grade]} Predictions",
+                title=f"GradCAM - Correct {CLASS_NAMES[grade]} Predictions",
             )
 
-        # 2. ERRORS — top confident mistakes (error analysis)
-        #    Shows: "where and why the model fails"
+        # Top confident mistakes for error analysis.
         error_samples = select_samples(
             y_true, y_pred, y_conf, idx,
             correct=False, topk=args.topk,
@@ -301,11 +275,10 @@ def main():
         generate_gradcam_grid(
             model, test_ds, error_samples, device=device,
             save_path=os.path.join(args.out_dir, "gradcam_top_errors.png"),
-            title="GradCAM — Top Confident Errors",
+            title="GradCAM - Top Confident Errors",
         )
 
-        # 3. NCI vs CI confusion specifically
-        #    Shows: "when model confuses NCI↔CI, where does it look?"
+        # NCI vs CI confusion: where the model looks when it confuses these classes.
         nci_as_ci = select_samples(
             y_true, y_pred, y_conf, idx,
             class_idx=1, correct=False, topk=args.topk,
@@ -314,7 +287,7 @@ def main():
             model, test_ds, nci_as_ci, device=device,
             save_path=os.path.join(args.out_dir,
                                    "gradcam_errors_NCI_misclassified.png"),
-            title="GradCAM — NCI-DME Misclassified (hardest class)",
+            title="GradCAM - NCI-DME Misclassified (hardest class)",
         )
 
         ci_as_nci = select_samples(
@@ -325,7 +298,7 @@ def main():
             model, test_ds, ci_as_nci, device=device,
             save_path=os.path.join(args.out_dir,
                                    "gradcam_errors_CI_misclassified.png"),
-            title="GradCAM — CI-DME Misclassified",
+            title="GradCAM - CI-DME Misclassified",
         )
 
     print(f"\n[DONE] All outputs: {args.out_dir}")

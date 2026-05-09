@@ -1,17 +1,11 @@
 """
-Method — Patch PCA Visualization for DINOv2 Backbone Analysis
-================================================================
-Purpose:
-    Visualize what a DINOv2 backbone has learned at the patch-token level.
-    For each image, we extract all patch embeddings from the last layer,
-    project them to 3 dimensions via PCA, and map those to RGB channels.
-    This produces a color map showing how the model internally separates
-    different spatial regions (e.g., retinal tissue vs background vs fluid).
+Patch PCA visualisation for DINOv2 backbone analysis.
 
-What this tells me:
-    - Whether the backbone distinguishes retinal tissue from background
-    - Whether it captures internal layer structure (RPE, ILM, fluid pockets)
-    - NOT attention or importance — just representational structure
+Extracts patch embeddings from the last layer, projects them to 3 dims via
+PCA, and maps the dimensions to RGB. The resulting colour map shows how the
+backbone internally separates spatial regions (retinal tissue, background,
+fluid pockets, layer structure). This is representational structure, not
+attention or importance.
 
 Usage:
     # Domain-adapted checkpoint
@@ -25,7 +19,7 @@ Usage:
         --img_size 518 --max_images 5 \
         --out_dir results/patch_pca/domain_adapted
 
-    # Baseline (original ImageNet pretrained — no
+    # Baseline (no --checkpoint -> ImageNet weights)
 
     # Run multiple diseases in aloop (adjust paths as needed)
     for disease in AMD DME ERM NO RVO VID; do
@@ -62,9 +56,7 @@ from analyse_shared import (
 )
 
 
-# ──────────────────────────────────────────────────────────────
 # Feature extraction
-# ──────────────────────────────────────────────────────────────
 
 @torch.no_grad()
 def get_patch_tokens(model: torch.nn.Module, x: torch.Tensor) -> torch.Tensor:
@@ -87,9 +79,7 @@ def get_patch_tokens(model: torch.nn.Module, x: torch.Tensor) -> torch.Tensor:
         )
 
 
-# ──────────────────────────────────────────────────────────────
 # Visualization
-# ──────────────────────────────────────────────────────────────
 
 def save_pca_map(
         raw_img_tensor: torch.Tensor,
@@ -140,7 +130,7 @@ def save_pca_map(
     fig, axes = plt.subplots(1, 3, figsize=(15, 4))
 
     axes[0].imshow(raw_np)
-    axes[0].set_title(f"Input — {label}")
+    axes[0].set_title(f"Input - {label}")
     axes[0].axis("off")
 
     axes[1].imshow(pca_resized)
@@ -164,9 +154,7 @@ def save_pca_map(
     return evr
 
 
-# ──────────────────────────────────────────────────────────────
 # Main
-# ──────────────────────────────────────────────────────────────
 
 def main():
     ap = argparse.ArgumentParser(
@@ -181,7 +169,7 @@ def main():
     device = get_device()
     grid_side = validate_img_size(args.img_size)
 
-    # ── Data ──
+    # Data
     samples = build_samples(
         args.csv, args.image_root,
         args.split_col, args.split,
@@ -194,7 +182,7 @@ def main():
     ds = OCTDataset(samples, img_size=args.img_size)
     dl = DataLoader(ds, batch_size=1, shuffle=False, num_workers=2)
 
-    # ── Model ──
+    # Model
     model = load_model(args.arch, args.checkpoint, device)
 
     # Shape check
@@ -203,7 +191,7 @@ def main():
         print(f"[INFO] Patch tokens shape: {test_tokens.shape}  "
               f"(expected [1, {grid_side ** 2}, *])")
 
-    # ── Process ──
+    # Process
     records: List[Dict] = []
     all_variance = []
 
@@ -237,7 +225,7 @@ def main():
             "explained_variance": [float(v) for v in evr],
         })
 
-    # ── Summary ──
+    # Summary
     avg_var = np.mean(all_variance, axis=0)
     print(f"\n[RESULT] Processed {len(records)} images")
     print(f"[RESULT] Avg explained variance (3 PCA components): "

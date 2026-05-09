@@ -263,7 +263,7 @@ def load_model(
         print(f"[FATAL] Likely cause: key prefix mismatch")
         sys.exit(1)
     elif loaded < total * 0.9:
-        print(f"\n[WARN] Only {loaded}/{total} keys — partial load")
+        print(f"\n[WARN] Only {loaded}/{total} keys - partial load")
     else:
         print(f"\n[MODEL] Domain-adapted weights loaded successfully")
 

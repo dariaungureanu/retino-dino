@@ -89,7 +89,6 @@ def extract_features_and_labels(model, loader, device):
     for images, labels_d, labels_c in tqdm(loader, desc="Extracting features"):
         images = images.to(device, non_blocking=True)
 
-        # Get backbone features — handle DINOv2 dict output
         feats = model.backbone(images)
         if isinstance(feats, dict):
             cls_token = feats["x_norm_clstoken"]
@@ -98,7 +97,6 @@ def extract_features_and_labels(model, loader, device):
         else:
             cls_token = feats
 
-        # If output is [B, seq_len, D], take CLS token (position 0)
         if cls_token.dim() == 3:
             cls_token = cls_token[:, 0, :]
 
@@ -117,13 +115,6 @@ def plot_tsne(features, labels, label_map, title, save_path,
               perplexity=30, random_state=42):
     """
     Compute t-SNE projection and plot colored by class.
-
-    Args:
-        features: [N, D] numpy array
-        labels: [N] numpy array of integer labels
-        label_map: {int: str} mapping from index to class name
-        title: plot title
-        save_path: where to save the PNG
     """
     # Filter out ignore_index labels (for condition)
     valid_mask = labels != IGNORE_INDEX
@@ -138,7 +129,6 @@ def plot_tsne(features, labels, label_map, title, save_path,
     tsne = TSNE(n_components=2, random_state=random_state, perplexity=perplexity)
     coords = tsne.fit_transform(features)
 
-    # Plot
     plt.figure(figsize=(12, 9))
     unique_labels = np.unique(labels)
     palette = sns.color_palette("bright", len(unique_labels))
@@ -173,11 +163,6 @@ class TaskHeadWrapper(nn.Module):
 
 
 def reshape_transform_vit(tensor):
-    """
-    Reshape ViT attention output for GradCAM.
-    Input: [B, num_tokens, C] (includes CLS token)
-    Output: [B, C, H, W] (CLS removed, reshaped to grid)
-    """
     result = tensor[:, 1:, :]  # drop CLS token
     grid_size = int(np.sqrt(result.size(1)))
     result = result.reshape(tensor.size(0), grid_size, grid_size, tensor.size(2))
@@ -186,7 +171,7 @@ def reshape_transform_vit(tensor):
 
 
 def denormalize(img_tensor):
-    """Undo ImageNet normalization → [0,1] RGB numpy array."""
+    """Undo ImageNet normalization, returning a [0,1] RGB numpy array."""
     img = img_tensor.detach().cpu().squeeze(0).permute(1, 2, 0).numpy()
     mean = np.array([0.485, 0.456, 0.406])
     std = np.array([0.229, 0.224, 0.225])
@@ -198,7 +183,6 @@ def denormalize(img_tensor):
 def collect_predictions(model, loader, device, head_index=0):
     """
     Run inference and collect predictions for one head.
-    Returns: y_true, y_pred, y_conf, sample_indices (all numpy)
     """
     model.eval()
     softmax = nn.Softmax(dim=1)
@@ -264,7 +248,6 @@ def generate_gradcam_grid(
         print(f"[SKIP] No samples for GradCAM: {task_name}")
         return
 
-    # Enable gradients for GradCAM (even on frozen params)
     for p in model.backbone.parameters():
         p.requires_grad_(True)
 
@@ -278,7 +261,7 @@ def generate_gradcam_grid(
 
     fig, axes = plt.subplots(n, 3, figsize=(14, 4 * n))
     if n == 1:
-        axes = axes[np.newaxis, :]  # ensure 2D
+        axes = axes[np.newaxis, :]
 
     for i, idx in enumerate(sample_indices):
         img_tensor, label_d, label_c = dataset[idx]
@@ -288,7 +271,6 @@ def generate_gradcam_grid(
         if true_label == IGNORE_INDEX:
             continue
 
-        # Get prediction
         with torch.no_grad():
             logits = wrapper(img_input)
             probs = softmax(logits)
@@ -299,47 +281,39 @@ def generate_gradcam_grid(
         pred_name = label_map.get(pred_class, f"?{pred_class}")
         rgb_img = denormalize(img_input)
 
-        # GradCAM for predicted and true class
         cam_pred = cam(input_tensor=img_input, targets=[ClassifierOutputTarget(pred_class)])[0]
         cam_true = cam(input_tensor=img_input, targets=[ClassifierOutputTarget(true_label)])[0]
 
         vis_pred = show_cam_on_image(rgb_img, cam_pred, use_rgb=True)
         vis_true = show_cam_on_image(rgb_img, cam_true, use_rgb=True)
 
-        # Plot row: Original | CAM Predicted | CAM True
         axes[i, 0].imshow(rgb_img)
         axes[i, 0].set_title(f"TRUE: {true_name}\nPRED: {pred_name} ({pred_conf:.2f})", fontsize=10)
         axes[i, 0].axis("off")
 
         axes[i, 1].imshow(vis_pred)
-        axes[i, 1].set_title(f"CAM → Predicted: {pred_name}", fontsize=10)
+        axes[i, 1].set_title(f"CAM -> Predicted: {pred_name}", fontsize=10)
         axes[i, 1].axis("off")
 
         axes[i, 2].imshow(vis_true)
-        axes[i, 2].set_title(f"CAM → True: {true_name}", fontsize=10)
+        axes[i, 2].set_title(f"CAM -> True: {true_name}", fontsize=10)
         axes[i, 2].axis("off")
 
-    fig.suptitle(f"GradCAM Error Analysis — {task_name}", fontsize=14, fontweight="bold", y=1.01)
+    fig.suptitle(f"GradCAM Error Analysis - {task_name}", fontsize=14, fontweight="bold", y=1.01)
     plt.tight_layout()
     fig.savefig(save_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
     print(f"[SAVED] {save_path}")
 
 
-# ═══════════════════════════════════════════════════════════════
-#  MAIN
-# ═══════════════════════════════════════════════════════════════
-
 def main():
     parser = argparse.ArgumentParser(description="Explainability: t-SNE + GradCAM")
 
-    # Paths
     parser.add_argument("--data_path", type=str, required=True)
     parser.add_argument("--model_path", type=str, default=None)
     parser.add_argument("--checkpoint_dir", type=str, default=None)
     parser.add_argument("--out_dir", type=str, default="results/explainability")
 
-    # Options
     parser.add_argument("--skip_tsne", action="store_true")
     parser.add_argument("--skip_gradcam", action="store_true")
     parser.add_argument("--gradcam_topk", type=int, default=8,
@@ -352,7 +326,6 @@ def main():
 
     args = parser.parse_args()
 
-    # Resolve checkpoint path
     if args.model_path:
         model_path = args.model_path
     elif args.checkpoint_dir:
@@ -363,7 +336,7 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     os.makedirs(args.out_dir, exist_ok=True)
 
-    # ── Load model ─────────────────────────────────────────────
+    # Load model
     model, ckpt = load_model_from_checkpoint(model_path, device)
     config = ckpt["config"]
     disease_map = ckpt["disease_map"]
@@ -371,7 +344,7 @@ def main():
     inv_disease = {v: k for k, v in disease_map.items()}
     inv_condition = {v: k for k, v in condition_map.items()}
 
-    # ── Load test data ─────────────────────────────────────────
+    # Load test data
     csv_path = os.path.join(args.data_path, "OCTDL_clean_metadata.csv")
     _, _, test_df, _, _ = get_data_splits(csv_path)
 
@@ -397,7 +370,7 @@ def main():
         # Disease t-SNE
         plot_tsne(
             features, labels_d, inv_disease,
-            title="t-SNE — Disease Feature Space (Fine-tuned)",
+            title="t-SNE - Disease Feature Space (Fine-tuned)",
             save_path=os.path.join(args.out_dir, "tsne_disease.png"),
             perplexity=args.tsne_perplexity,
         )
@@ -405,7 +378,7 @@ def main():
         # Condition t-SNE
         plot_tsne(
             features, labels_c, inv_condition,
-            title="t-SNE — Condition Feature Space (Fine-tuned)",
+            title="t-SNE - Condition Feature Space (Fine-tuned)",
             save_path=os.path.join(args.out_dir, "tsne_condition.png"),
             perplexity=args.tsne_perplexity,
         )
@@ -415,7 +388,7 @@ def main():
         print(f"  GRADCAM ERROR ANALYSIS")
         print(f"{'='*60}")
 
-        # Disease — top errors
+        # Top disease errors
         y_true_d, y_pred_d, y_conf_d, idx_d = collect_predictions(
             model, test_loader, device, head_index=0,
         )
@@ -428,7 +401,7 @@ def main():
             save_path=os.path.join(args.out_dir, "gradcam_disease_top_errors.png"),
         )
 
-        # Condition — top errors
+        # Top condition errors
         y_true_c, y_pred_c, y_conf_c, idx_c = collect_predictions(
             model, test_loader, device, head_index=1,
         )

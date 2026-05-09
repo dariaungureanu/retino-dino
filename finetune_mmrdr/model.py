@@ -1,8 +1,7 @@
 """
 Single-Task DINOv2 Model for MMRDR-OCT (DME grading).
 
-Same backbone loading as OCTDL pipeline.
-Single classification head: 384 → 256 → 3 classes.
+Single classification head: 384 -> 256 -> 3 classes.
 """
 
 import os
@@ -13,10 +12,7 @@ import torch.nn.functional as F
 
 
 def load_backbone(arch, checkpoint, device):
-    """
-    Load DINOv2 backbone — same logic as OCTDL pipeline.
-    Handles FSDP checkpoints, prefix matching, pos_embed interpolation.
-    """
+    """Load DINOv2 backbone. Handles FSDP checkpoints, prefix matching, pos_embed interpolation."""
     print(f"\n{'='*60}")
     print(f"  MODEL LOADING")
     print(f"{'='*60}")
@@ -26,7 +22,7 @@ def load_backbone(arch, checkpoint, device):
     print(f"[MODEL] {arch}: {len(model_keys)} params")
 
     if checkpoint is None:
-        print(f"[MODEL] No checkpoint → ImageNet baseline")
+        print(f"[MODEL] No checkpoint -> ImageNet baseline")
         return model.to(device)
 
     if not os.path.isfile(checkpoint):
@@ -36,7 +32,6 @@ def load_backbone(arch, checkpoint, device):
     ckpt = torch.load(checkpoint, map_location="cpu")
     print(f"[MODEL] Checkpoint: {checkpoint}")
 
-    # Extract sub-dict
     if "model" in ckpt:
         st = ckpt["model"]
     elif "teacher" in ckpt:
@@ -46,7 +41,6 @@ def load_backbone(arch, checkpoint, device):
     else:
         st = ckpt
 
-    # Try prefix patterns
     PREFIX_PATTERNS = ["teacher.backbone.", "backbone.", "module.backbone.", "module.", ""]
     clean = {}
     matched_prefix = None
@@ -78,7 +72,6 @@ def load_backbone(arch, checkpoint, device):
 
     print(f"[MODEL] Prefix: '{matched_prefix}', {len(clean)} keys")
 
-    # pos_embed interpolation
     if "pos_embed" in clean and "pos_embed" in model_keys:
         ckpt_pos = clean["pos_embed"]
         model_pos = model.state_dict()["pos_embed"]
@@ -110,10 +103,7 @@ def load_backbone(arch, checkpoint, device):
 
 
 class MMRDRModel(nn.Module):
-    """
-    Single-task classifier: DINOv2 backbone → single MLP head → 3 classes.
-    Same architecture as OCTDL heads, just one instead of two.
-    """
+    """Single-task classifier: DINOv2 backbone -> single MLP head -> 3 classes."""
     EMBED_DIM = 384  # ViT-S/14
     NUM_BLOCKS = 12
 
