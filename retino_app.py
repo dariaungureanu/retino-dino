@@ -79,7 +79,12 @@ def _interpolate_pos_embed(state, model):
 
 
 def load_ssl_backbone(weights_path):
-    """Load DINOv2 from hub, then overwrite with SSL teacher weights."""
+    """Load DINOv2 from hub; if weights_path is given, overwrite with the
+    FSDP teacher state-dict (keys prefixed with `teacher.backbone.`).
+
+    weights_path=None -> keep hub-default ImageNet weights (used for the IN
+    baseline).
+    """
     model = _build_dinov2()
 
     if weights_path is None: #skip this step -> keep ImageNet weights
@@ -89,38 +94,22 @@ def load_ssl_backbone(weights_path):
         raise FileNotFoundError(f"SSL backbone weights not found: {weights_path}")
 
     ckpt = torch.load(weights_path, map_location="cpu", weights_only=False)
-    if "model" in ckpt:
-        st_dict = ckpt["model"]
-    elif "teacher" in ckpt:
+    if "teacher" in ckpt:
         st_dict = ckpt["teacher"]
+    elif "model" in ckpt:
+        st_dict = ckpt["model"]
     elif "state_dict" in ckpt:
         st_dict = ckpt["state_dict"]
     else:
         st_dict = ckpt
 
-    model_keys = set(model.state_dict().keys())
-    PREFIXES = ["teacher.backbone.", "backbone.", "module.backbone.", "module.", ""]
-    clean = {}
-    for prefix in PREFIXES:
-        cand = {}
-        for k, v in st_dict.items():
-            if prefix and k.startswith(prefix):
-                cand[k[len(prefix):]] = v
-            elif prefix == "" and not any(k.startswith(p) for p in
-                ["dino_loss", "ibot_patch_loss", "dino_head", "ibot_head",
-                 "student.", "teacher."]):
-                cand[k] = v
-        if cand:
-            overlap = set(cand.keys()) & model_keys
-            if len(overlap) > len(model_keys) * 0.5:
-                clean = cand
-                break
+    PREFIX = "teacher.backbone."
+    clean = {k[len(PREFIX):]: v for k, v in st_dict.items() if k.startswith(PREFIX)}
     if not clean:
-        for k, v in st_dict.items():
-            for prefix in ("teacher.backbone.", "student.backbone.", "backbone."):
-                if k.startswith(prefix):
-                    clean[k[len(prefix):]] = v
-                    break
+        raise RuntimeError(
+            f"No keys with prefix '{PREFIX}' in {weights_path}; "
+            "this loader expects an FSDP teacher checkpoint."
+        )
 
     _interpolate_pos_embed(clean, model)
     model.load_state_dict(clean, strict=False)
@@ -176,7 +165,7 @@ class SingleHeadModel(nn.Module): #For MMRDR (3 classes), Corina (4 biomarkers),
 
 # GradCAM helpers
 def vit_reshape_transform(tensor):
-    """Drop CLS token and reshape (B, 1+N, D) → (B, D, H, W) for ViT."""
+    """Drop CLS token and reshape (B, 1+N, D) -> (B, D, H, W) for ViT."""
     patches = tensor[:, 1:, :]
     g = int(round(patches.size(1) ** 0.5))
     out = patches.reshape(tensor.size(0), g, g, tensor.size(2))
@@ -267,6 +256,12 @@ TASKS = {
 # Cached model loading
 @st.cache_resource(show_spinner=False) # the model is only loaded once,
 def get_model(task_key: str, variant: str):
+    """Returns (model, labels). `labels` is a dict whose contents depend on
+    task type and are derived from the saved maps in the checkpoint:
+        octdl       -> {"disease": [...], "condition": [...]}
+        single      -> {"classes":   [...]}
+        multilabel  -> {"biomarkers": [...]}
+    """
     spec = TASKS[task_key]
     ckpt_name = spec["ckpt_da"] if variant == "da" else spec["ckpt_in"]
     ckpt_path = os.path.join(CKPT_DIR, ckpt_name)
@@ -279,15 +274,40 @@ def get_model(task_key: str, variant: str):
     backbone_weights = SSL_BACKBONE if variant == "da" else None
     backbone = load_ssl_backbone(backbone_weights)
 
+    label_sources = {}
     if spec["type"] == "octdl":
-        d_map = ckpt.get("disease_map", {n: i for i, n in enumerate(spec["disease"])})
-        c_map = ckpt.get("condition_map", {n: i for i, n in enumerate(spec["condition"])})
-        model = OCTDLModel(backbone, len(d_map), len(c_map))
+        d_src = "ckpt.disease_map" if ckpt.get("disease_map") else "spec.disease"
+        c_src = "ckpt.condition_map" if ckpt.get("condition_map") else "spec.condition"
+        d_map = ckpt.get("disease_map") or {n: i for i, n in enumerate(spec["disease"])}
+        c_map = ckpt.get("condition_map") or {n: i for i, n in enumerate(spec["condition"])}
+        diseases   = [n for n, _ in sorted(d_map.items(), key=lambda kv: kv[1])]
+        conditions = [n for n, _ in sorted(c_map.items(), key=lambda kv: kv[1])]
+        labels = {"disease": diseases, "condition": conditions}
+        label_sources = {"disease": d_src, "condition": c_src}
+        model = OCTDLModel(backbone, len(diseases), len(conditions))
     elif spec["type"] == "single":
+        n_src = "ckpt.num_classes" if "num_classes" in ckpt else "spec.classes (count)"
         n = ckpt.get("num_classes", len(spec["classes"]))
+        if "classes" in ckpt and ckpt["classes"]:
+            names = list(ckpt["classes"])[:n]
+            names_src = "ckpt.classes"
+        else:
+            names = list(spec["classes"][:n])
+            names_src = "spec.classes"
+        labels = {"classes": names}
+        label_sources = {"count": n_src, "names": names_src}
         model = SingleHeadModel(backbone, n)
     else:
+        n_src = "ckpt.num_labels" if "num_labels" in ckpt else "spec.biomarkers (count)"
         n = ckpt.get("num_labels", len(spec["biomarkers"]))
+        if "biomarkers" in ckpt and ckpt["biomarkers"]:
+            names = list(ckpt["biomarkers"])[:n]
+            names_src = "ckpt.biomarkers"
+        else:
+            names = list(spec["biomarkers"][:n])
+            names_src = "spec.biomarkers"
+        labels = {"biomarkers": names}
+        label_sources = {"count": n_src, "names": names_src}
         model = SingleHeadModel(backbone, n)
 
     missing, unexpected = model.load_state_dict(ckpt["model_state_dict"], strict=False)
@@ -297,7 +317,14 @@ def get_model(task_key: str, variant: str):
     backbone_missing = [k for k in missing if "head" not in k]
     head_unexpected = [k for k in unexpected if "head" in k]
 
-    print(f"\n=== {task_key}/{variant} checkpoint diagnostic ===", file=sys.stderr)
+    variant_long = "domain-adapted (DA)" if variant == "da" else "ImageNet baseline (IN)"
+    print(f"\n=== {task_key}/{variant} [{variant_long}] checkpoint diagnostic ===",
+          file=sys.stderr)
+    print(f"  ckpt file:             {ckpt_name}", file=sys.stderr)
+    print(f"  backbone init:         "
+          f"{'SSL teacher (model_final.rank_0.pth)' if variant == 'da' else 'hub default (ImageNet)'}",
+          file=sys.stderr)
+    print(f"  label sources:         {label_sources}", file=sys.stderr)
     print(f"  ckpt top-level keys:   {list(ckpt.keys())}", file=sys.stderr)
     print(f"  ckpt epoch / best:     "
           f"{ckpt.get('epoch', '?')} / "
@@ -334,7 +361,7 @@ def get_model(task_key: str, variant: str):
 
     for p in model.parameters():
         p.requires_grad_(True)
-    return model
+    return model, labels
 
 
 # Inference helpers
@@ -393,6 +420,12 @@ _BAR_TOP    = 0.86
 _BAR_FIG_W  = 4.8
 _BAR_ROW_H  = 0.38
 _BAR_PAD_H  = 0.95
+
+# Display sizes for GradCAM panels (px). One "hero" size for the single
+# inspection view and the compare-mode 2x2 panels, and a smaller "grid" size
+# for the multi-label tile grid so 4 OCT5k panels in a row stay readable.
+GRADCAM_HERO_W = 360
+GRADCAM_GRID_W = 280
 
 
 def _truncate(label, n=14):
@@ -469,48 +502,115 @@ def _confidence_caption(container, max_conf, n_classes):
         )
 
 
-def render_predictions(spec, preds, container, header):
+def render_predictions(spec, labels, preds, container, header,
+                       side_by_side=True, threshold=0.5):
     """
       The dispatcher. Reads spec["type"] and renders the right format:
       - "octdl" - two bar charts (one per head) + two argmax summaries.
       - "single" - one bar chart + the predicted class.
-      - "multilabel" - the panel + a "Active biomarkers (≥0.5): X, Y" line.
+      - "multilabel" - the panel + a "Active biomarkers (>=threshold): X, Y" line.
+
+    `labels` is the display dict produced by get_model (derived from the saved
+    maps). `side_by_side` is OCTDL-only: True puts disease+condition charts in
+    two columns, False stacks them (used in compare mode where each model
+    already lives in its own column and nesting more would not fit).
     """
-    container.markdown(f"#### {header}")
+    if header:
+        container.markdown(f"#### {header}")
     if spec["type"] == "octdl":
+        diseases = labels["disease"]
+        conditions = labels["condition"]
         d_idx = int(np.argmax(preds["disease"]))
         c_idx = int(np.argmax(preds["condition"]))
         d_conf = float(preds["disease"][d_idx])
         c_conf = float(preds["condition"][c_idx])
         container.markdown(
-            f"**Disease:** `{spec['disease'][d_idx]}` ({d_conf*100:.1f}%)"
+            f"**Disease:** `{diseases[d_idx]}` ({d_conf*100:.1f}%)"
         )
         container.markdown(
-            f"**Condition:** `{spec['condition'][c_idx]}` ({c_conf*100:.1f}%)"
+            f"**Condition:** `{conditions[c_idx]}` ({c_conf*100:.1f}%)"
         )
-        container.pyplot(_bar_chart(preds["disease"], spec["disease"], d_idx,
+        if side_by_side:
+            col_d, col_c = container.columns(2)
+            col_d.pyplot(_bar_chart(preds["disease"], diseases, d_idx,
                                     "Disease head"), clear_figure=True)
-        _confidence_caption(container, d_conf, len(spec["disease"]))
-        container.pyplot(_bar_chart(preds["condition"], spec["condition"], c_idx,
+            _confidence_caption(col_d, d_conf, len(diseases))
+            col_c.pyplot(_bar_chart(preds["condition"], conditions, c_idx,
                                     "Condition head"), clear_figure=True)
-        _confidence_caption(container, c_conf, len(spec["condition"]))
+            _confidence_caption(col_c, c_conf, len(conditions))
+        else:
+            container.pyplot(_bar_chart(preds["disease"], diseases, d_idx,
+                                        "Disease head"), clear_figure=True)
+            _confidence_caption(container, d_conf, len(diseases))
+            container.pyplot(_bar_chart(preds["condition"], conditions, c_idx,
+                                        "Condition head"), clear_figure=True)
+            _confidence_caption(container, c_conf, len(conditions))
     elif spec["type"] == "single":
+        classes = labels["classes"]
         idx = int(np.argmax(preds["probs"]))
         conf = float(preds["probs"][idx])
         container.markdown(
-            f"**Prediction:** `{spec['classes'][idx]}` ({conf*100:.1f}%)"
+            f"**Prediction:** `{classes[idx]}` ({conf*100:.1f}%)"
         )
-        container.pyplot(_bar_chart(preds["probs"], spec["classes"], idx),
+        container.pyplot(_bar_chart(preds["probs"], classes, idx),
                          clear_figure=True)
-        _confidence_caption(container, conf, len(spec["classes"]))
+        _confidence_caption(container, conf, len(classes))
     else:
-        labels = spec["biomarkers"]
-        active = [labels[i] for i, p in enumerate(preds["probs"]) if p >= 0.5]
+        biomarkers = labels["biomarkers"]
+        active = [biomarkers[i] for i, p in enumerate(preds["probs"]) if p >= threshold]
         container.markdown(
-            f"**Active biomarkers (≥0.5):** "
+            f"**Active biomarkers (>={threshold:.2f}):** "
             + (", ".join(f"`{a}`" for a in active) if active else "_none_")
         )
-        container.pyplot(_multilabel_panel(preds["probs"], labels), clear_figure=True)
+        container.pyplot(_multilabel_panel(preds["probs"], biomarkers,
+                                           threshold=threshold), clear_figure=True)
+
+
+def _select_grid_indices(probs, threshold, fallback_top_k=3):
+    """Pick which biomarkers to GradCAM. Active set if any cross threshold,
+    else top-K by probability so the grid is never empty."""
+    active = [i for i, p in enumerate(probs) if p >= threshold]
+    if active:
+        return active, False
+    k = min(fallback_top_k, len(probs))
+    top = list(np.argsort(probs)[::-1][:k])
+    return [int(i) for i in top], True
+
+
+def render_multilabel_gradcam_grid(model, x, biomarkers, probs, threshold,
+                                   container, n_cols=None):
+    """One GradCAM panel per active biomarker (or top-3 fallback). Layout is
+    2 columns for Corina (4 labels) and 4 for OCT5k (8 labels)."""
+    if n_cols is None:
+        n_cols = 4 if len(biomarkers) >= 8 else 2
+
+    idxs, fell_back = _select_grid_indices(probs, threshold)
+    if fell_back:
+        container.caption(
+            f"No biomarkers above threshold {threshold:.2f}; "
+            f"showing top {len(idxs)} by probability instead."
+        )
+
+    rows = [idxs[i:i + n_cols] for i in range(0, len(idxs), n_cols)]
+    for row in rows:
+        cols = container.columns(n_cols)
+        for j, bio_idx in enumerate(row):
+            cam_img = gradcam(model, x, "multilabel", None, bio_idx)
+            cols[j].image(
+                cam_img,
+                caption=f"{biomarkers[bio_idx]} · {probs[bio_idx]*100:.1f}%",
+                width=GRADCAM_GRID_W,
+            )
+
+
+def _resize_to_height(img: Image.Image, target_h: int) -> Image.Image:
+    """Resize a PIL image to a fixed display height, preserving aspect.
+    Used so the original and GradCAM panels line up vertically even when the
+    user uploads a landscape OCT scan."""
+    if img.height == 0:
+        return img
+    w = max(1, int(round(img.width * target_h / img.height)))
+    return img.resize((w, target_h), Image.LANCZOS)
 
 
 # Sample images
@@ -582,8 +682,17 @@ def parse_sample_label(task_key: str, filename: str) -> str:
     return "?"
 
 
-def gallery_files(spec):
-    """Collect PNG/JPGs from the task's results dirs (recursive)."""
+def _gallery_mtimes(spec):
+    """Tuple of dir mtimes used as the cache key for gallery_files"""
+    return tuple(os.path.getmtime(d)
+                 for d in spec["gallery_dirs"] if os.path.isdir(d))
+
+
+@st.cache_data(show_spinner=False)
+def gallery_files(task_key, mtimes):
+    """Collect PNG/JPGs from the task's results dirs (recursive). Cached on
+    (task_key, mtimes) so directory walks happen only when files change."""
+    spec = TASKS[task_key]
     files = []
     for d in spec["gallery_dirs"]:
         if not os.path.isdir(d):
@@ -603,6 +712,130 @@ def gallery_files(spec):
         seen.add(full)
         out.append((rel, full))
     return out
+
+
+REPORT_CATEGORIES = [
+    ("All",                  lambda r: True),
+    ("Confusion matrices",   lambda r: "confusion" in r.lower()),
+    ("GradCAM",              lambda r: "explainability" in r.lower()
+                                       or "gradcam" in r.lower()
+                                       or "grad_cam" in r.lower()),
+    ("Latent space (t-SNE)", lambda r: "tsne" in r.lower()
+                                       or "t-sne" in r.lower()
+                                       or "latent" in r.lower()),
+    ("Disease vs Condition", lambda r: "disease_vs_condition" in r.lower()),
+    ("Patient-level",        lambda r: "patient_level" in r.lower()
+                                       or "patient-level" in r.lower()),
+    ("Data efficiency",      lambda r: "data_efficiency" in r.lower()
+                                       or "efficiency" in r.lower()),
+]
+
+def _md_table(header, rows):
+    head = "| " + " | ".join(header) + " |"
+    align = "|" + "|".join(["---:" if i > 0 else "---" for i in range(len(header))]) + "|"
+    body = "\n".join("| " + " | ".join(str(c) for c in r) + " |" for r in rows)
+    return "\n".join([head, align, body])
+
+
+PRETRAIN_FROZEN = {
+    "header": ["Checkpoint", "kNN Acc", "kNN Bal-Acc", "kNN F1",
+               "LP Acc", "LP Bal-Acc", "LP F1"],
+    "rows": [
+        ("ImageNet ViT-S/14 (baseline)",      "0.739", "0.382", "0.419",
+                                              "0.804", "0.663", "0.667"),
+        ("ViT-S/14 Epoch 5 (6,250 iter)",     "0.911", "0.755", "0.774",
+                                              "0.896", "0.764", "0.738"),
+        ("ViT-S/14 Epoch 15 (18,750 iter)",   "0.931", "0.796", "0.812",
+                                              "0.936", "0.810", "0.820"),
+        ("ViT-S/14 Final (37,500 iter)",      "0.938", "0.804", "0.824",
+                                              "0.938", "0.835", "0.841"),
+        ("Old manual ViT-B/14 (before using dino repo)",     "0.794", "0.498", "0.558",
+                                              "0.888", "0.748", "0.742"),
+    ],
+}
+
+OCTDL_RUNS = {
+    "header": ["Run", "Strategy", "Disease F1", "Cond F1", "Best epoch"],
+    "rows": [
+        ("A", "Frozen (0 blocks), lr_heads 1e-3",   "0.808", "0.792", "5"),
+        ("B", "Unfreeze 1 block (block 11 + norm)", "0.833", "0.804", "4"),
+        ("C", "Unfreeze 2 blocks (10-11 + norm)",   "**0.845**", "**0.820**", "4"),
+        ("D", "Run C + RandomHorizontalFlip",       "0.841", "0.801", "4"),
+        ("E", "Run C config, ImageNet ViT-S/14 (no DA)", "0.800", "0.741", "18"),
+        ("Before using dino repo", "ViT-Large partial unfreeze, old SSL", "0.749", "0.704", "15-23"),
+    ],
+}
+
+OCTDL_PATIENT = {
+    "header": ["Metric", "Image-level", "Patient (majority vote)", "Patient (avg-probs)"],
+    "rows": [
+        ("Disease Acc",        "93.5 %",  "90.9 %",  "91.5 %"),
+        ("Disease Macro-F1",   "0.8446",  "0.8285",  "0.8344"),
+        ("Condition Acc",      "84.2 %",  "83.4 %",  "—"),
+        ("Condition Macro-F1", "0.8202",  "0.8142",  "—"),
+    ],
+}
+
+OCTDL_DATAEFF = {
+    "header": ["Fraction", "N_train", "DA Disease F1", "IN Disease F1", "Δ",
+               "DA Cond F1", "IN Cond F1", "Δ"],
+    "rows": [
+        ("33 %",  "459",   "0.820", "0.674", "+0.146", "0.734", "0.634", "+0.100"),
+        ("66 %",  "947",   "0.850", "0.784", "+0.066", "0.802", "0.652", "+0.150"),
+        ("100 %", "1,410", "0.837", "0.797", "+0.040", "0.807", "0.696", "+0.111"),
+    ],
+}
+
+MMRDR_COMPARE = {
+    "header": ["Method", "Pretraining", "Aug", "Acc", "κ", "Macro F1", "F1 NCI-DME"],
+    "rows": [
+        ("ViT-Base (paper)",      "ImageNet", "Yes", "0.883", "0.773", "0.700", "0.280"),
+        ("ResNet-50 (paper)",     "ImageNet", "Yes", "0.890", "0.791", "0.701", "0.259"),
+        ("RETFound (paper)",      "SSL 1.6 M", "Yes", "0.897", "0.803", "0.759", "0.436"),
+        ("My ImageNet (Run E)",   "ImageNet", "No",  "0.845", "0.722", "0.689", "0.28"),
+        ("My ImageNet + aug",     "ImageNet", "Yes", "0.769", "0.625", "0.662", "0.29"),
+        ("**My DA (40 k SSL)**",  "SSL 40 k", "No",  "0.875", "0.770", "0.760", "0.47"),
+        ("**My DA + aug**",       "SSL 40 k", "Yes", "**0.890**", "**0.798**", "**0.775**", "**0.49**"),
+    ],
+}
+
+CORINA_PER_BIO = {
+    "header": ["Biomarker", "F1", "AUC", "Acc"],
+    "rows": [
+        ("DME",     "0.909", "0.980", "88.7 %"),
+        ("HF",      "0.922", "0.942", "89.0 %"),
+        ("ND",      "0.813", "0.964", "92.6 %"),
+        ("Healthy", "0.917", "0.993", "95.7 %"),
+        ("**Macro**", "**0.890**", "**0.970**", "—"),
+    ],
+}
+
+CORINA_VS = {
+    "header": ["Variant", "Macro F1", "Macro AUC", "Exact Match"],
+    "rows": [
+        ("My DA (22 M, SSL 40 k)",        "0.890", "0.970", "74.8 %"),
+        ("My ImageNet (22 M)",            "0.707", "0.930", "49.1 %"),
+        ("ConvNeXt-base reference (87 M)", "≈0.86", "—",     "—"),
+    ],
+}
+
+OCT5K_PER_BIO = {
+    "header": ["Biomarker (n_pos)", "DA F1", "IN F1", "Δ F1",
+               "DA AUC", "IN AUC", "Δ AUC"],
+    "rows": [
+        ("CF (11)",   "0.50", "0.35", "+0.15", "0.83", "0.76", "+0.07"),
+        ("GA (19)",   "0.84", "0.73", "+0.11", "0.98", "0.90", "+0.08"),
+        ("HD (43)",   "0.79", "0.61", "+0.18", "0.85", "0.77", "+0.08"),
+        ("HFS (1)",   "0.08", "0.00", "—",     "0.87", "0.10", "—"),
+        ("PRL (42)",  "0.84", "0.78", "+0.06", "0.95", "0.93", "+0.02"),
+        ("RD (16)",   "0.39", "0.20", "+0.19", "0.69", "0.53", "+0.16"),
+        ("SD (69)",   "0.85", "0.86", "−0.01", "0.88", "0.87", "+0.01"),
+        ("SDPED (21)", "0.24", "0.23", "+0.01", "0.70", "0.57", "+0.13"),
+        ("**Macro**", "**0.567**", "**0.469**", "**+0.098**",
+                      "**0.843**", "**0.678**", "**+0.165**"),
+        ("Exact Match", "30.8 %", "13.1 %", "+17.7 %", "—", "—", "—"),
+    ],
+}
 
 
 # The main Streamlit UI
@@ -656,6 +889,15 @@ def main():
                  "and show the predictions side by side.",
         )
 
+        threshold = 0.5
+        if spec["type"] == "multilabel":
+            threshold = st.slider(
+                "Decision threshold", 0.1, 0.9, 0.5, 0.05,
+                help="Biomarkers with sigmoid probability >= this value are "
+                     "called 'present'. Drives both the bar panel and the "
+                     "active set in the GradCAM grid.",
+            )
+
         #File uploader, accepts standard image formats
         st.divider()
         st.markdown("**Image source**")
@@ -686,7 +928,16 @@ def main():
             f"Device: `{DEVICE.type}`"
         )
 
-    tab_predict, tab_reports = st.tabs(["Predict", "Reports"])
+        with st.expander("About / Model card"):
+            st.markdown(
+                "**Backbone:** ViT-S/14 (~22 M params)  \n"
+                "**SSL data:** 40 k OCT images, official DINOv2 repo with "
+                "iBOT + KoLeo, 30 epochs  \n"
+                "**Limitation:** A subset of OCT5k images was present in the "
+                "SSL pretraining pool - documented in the thesis."
+            )
+
+    tab_predict, tab_reports, tab_perf = st.tabs(["Predict", "Reports", "Performance"])
 
     #Predict tab
     with tab_predict:
@@ -717,103 +968,181 @@ def main():
 
         with st.spinner("Loading domain-adapted model..."):
             try:
-                model_da = get_model(task_key, "da")
+                model_da, labels_da = get_model(task_key, "da")
             except Exception as e:
                 st.error(f"Failed to load DA checkpoint: {e}")
                 return
 
-        model_in = None
+        model_in, labels_in = None, None
         if compare:
             with st.spinner("Loading ImageNet baseline..."):
                 try:
-                    model_in = get_model(task_key, "in")
+                    model_in, labels_in = get_model(task_key, "in")
                 except Exception as e:
                     st.warning(f"ImageNet checkpoint not available: {e}")
 
-        #GradCAM target picker
-        st.markdown("### Inputs")
-        c_orig, c_ctrl = st.columns([2, 3])
-        with c_orig:
-            cap = source_name or "Uploaded image"
-            st.image(image, caption=cap, use_container_width=True)
-            if expected_label:
-                st.caption(f"Expected (from filename): **{expected_label}**")
-
-        with c_ctrl:
-            target_kind, target_idx, target_label = _target_picker(spec)
-            st.caption(
-                "GradCAM highlights the regions that most influenced the "
-                f"selected output: **{target_label}**."
-            )
+        # GradCAM target picker
+        st.markdown("### Controls")
+        target_kind, target_idx, target_label, focus = _target_picker(
+            spec, labels_da, force_focus=(model_in is not None),
+        )
+        st.caption(
+            "GradCAM highlights the regions that most influenced the "
+            f"selected output: **{target_label}**."
+        )
 
         #Run predictions + GradCAM
         preds_da = predict(model_da, x, spec["type"])
-        with st.spinner("Computing GradCAM (DA)..."):
-            cam_da = gradcam(model_da, x, spec["type"], target_kind, target_idx)
+        cam_da = None
+        if spec["type"] != "multilabel" or focus:
+            with st.spinner("Computing GradCAM (DA)..."):
+                cam_da = gradcam(model_da, x, spec["type"], target_kind, target_idx)
 
         preds_in = cam_in = None
         if model_in is not None:
             preds_in = predict(model_in, x, spec["type"])
-            with st.spinner("Computing GradCAM (ImageNet)..."):
-                cam_in = gradcam(model_in, x, spec["type"], target_kind, target_idx)
+            if spec["type"] != "multilabel" or focus:
+                with st.spinner("Computing GradCAM (ImageNet)..."):
+                    cam_in = gradcam(model_in, x, spec["type"], target_kind, target_idx)
+
+        DISPLAY_HEIGHT = GRADCAM_HERO_W  # the gradcam is square (224x224),
+        # so resizing it to height=GRADCAM_HERO_W also makes it that wide.
+        cam_h = Image.fromarray(cam_da) if cam_da is not None else None
 
         st.markdown("### Results")
         if model_in is None:
-            col_cam, col_pred = st.columns([1, 1])
-            with col_cam:
-                st.image(cam_da, caption=f"GradCAM · {target_label}",
-                         use_container_width=True)
-            render_predictions(spec, preds_da, col_pred,
-                               header="Predictions  ·  domain-adapted")
+            if spec["type"] == "multilabel" and not focus:
+                col_orig, col_label = st.columns([2, 3])
+                with col_orig:
+                    st.image(_resize_to_height(image, DISPLAY_HEIGHT),
+                             caption=source_name or "Uploaded image")
+                    if expected_label:
+                        st.caption(f"Expected (from filename): **{expected_label}**")
+                with col_label:
+                    st.markdown("**Original scan (left).**  GradCAMs for each "
+                                "active biomarker are shown below the predictions.")
+                render_predictions(spec, labels_da, preds_da, st,
+                                   header="Predictions  ·  domain-adapted",
+                                   threshold=threshold)
+                st.markdown("##### Active biomarker GradCAMs")
+                render_multilabel_gradcam_grid(
+                    model_da, x, labels_da["biomarkers"],
+                    preds_da["probs"], threshold, st,
+                )
+            else:
+                col_orig, col_cam = st.columns([2, 3])
+                with col_orig:
+                    st.image(_resize_to_height(image, DISPLAY_HEIGHT),
+                             caption=source_name or "Uploaded image")
+                    if expected_label:
+                        st.caption(f"Expected (from filename): **{expected_label}**")
+                with col_cam:
+                    st.image(_resize_to_height(cam_h, DISPLAY_HEIGHT),
+                             caption=f"GradCAM · {target_label}")
+                render_predictions(spec, labels_da, preds_da, st,
+                                   header="Predictions  ·  domain-adapted",
+                                   threshold=threshold,
+                                   side_by_side=True)
         else:
-            cda, cin = st.columns(2)
-            with cda:
+            st.image(_resize_to_height(image, DISPLAY_HEIGHT),
+                     caption=source_name or "Uploaded image")
+            if expected_label:
+                st.caption(f"Expected (from filename): **{expected_label}**")
+
+            cam_in_h = Image.fromarray(cam_in) if cam_in is not None else None
+
+            if spec["type"] == "octdl":
                 st.markdown("##### Domain-adapted")
-                st.image(cam_da, use_container_width=True)
-                render_predictions(spec, preds_da, st, header="")
-            with cin:
+                render_predictions(spec, labels_da, preds_da, st, header="",
+                                   side_by_side=True, threshold=threshold)
+                st.image(cam_h, caption=f"DA · GradCAM ({target_label})",
+                         width=GRADCAM_HERO_W)
+                st.divider()
                 st.markdown("##### ImageNet baseline")
-                st.image(cam_in, use_container_width=True)
-                render_predictions(spec, preds_in, st, header="")
+                render_predictions(spec, labels_in, preds_in, st, header="",
+                                   side_by_side=True, threshold=threshold)
+                st.image(cam_in_h, caption=f"IN · GradCAM ({target_label})",
+                         width=GRADCAM_HERO_W)
+            else:
+                row1_l, row1_r = st.columns(2)
+                with row1_l:
+                    st.markdown("##### Domain-adapted")
+                    render_predictions(spec, labels_da, preds_da, row1_l,
+                                       header="", side_by_side=False,
+                                       threshold=threshold)
+                with row1_r:
+                    st.markdown("##### ImageNet baseline")
+                    render_predictions(spec, labels_in, preds_in, row1_r,
+                                       header="", side_by_side=False,
+                                       threshold=threshold)
+                row2_l, row2_r = st.columns(2)
+                row2_l.image(cam_h, caption=f"DA - GradCAM ({target_label})",
+                             width=GRADCAM_HERO_W)
+                row2_r.image(cam_in_h, caption=f"IN - GradCAM ({target_label})",
+                             width=GRADCAM_HERO_W)
 
     #Reports tab
     with tab_reports:
         st.markdown(f"### Pre-generated reports - {task_key}")
-        files = gallery_files(spec)
+        files = gallery_files(task_key, _gallery_mtimes(spec))
         if not files:
             st.info("No report images found in the task's results folders yet.")
-            return
+        else:
+            cat_names = [c for c, _ in REPORT_CATEGORIES]
+            cat = st.radio("Category", cat_names, horizontal=True)
+            predicate = dict(REPORT_CATEGORIES)[cat]
+            filtered = [(rel, full) for rel, full in files if predicate(rel)]
 
-        names = [rel for rel, _ in files]
-        choice = st.selectbox("Pick a figure", names, index=0)
-        chosen_full = dict(files)[choice]
-        st.image(chosen_full, caption=choice, use_container_width=True)
+            if not filtered:
+                st.info(f"No figures match category **{cat}**.")
+            else:
+                names = [rel for rel, _ in filtered]
+                choice = st.selectbox("Pick a figure", names, index=0)
+                chosen_full = dict(filtered)[choice]
+                st.image(chosen_full, caption=choice, width="stretch")
 
-        with st.expander(f"All figures ({len(files)})", expanded=False):
-            cols = st.columns(3)
-            for i, (rel, full) in enumerate(files):
-                with cols[i % 3]:
-                    st.image(full, caption=rel, use_container_width=True)
+                with st.expander(f"All figures in {cat} ({len(filtered)})",
+                                 expanded=False):
+                    cols = st.columns(3)
+                    for i, (rel, full) in enumerate(filtered):
+                        with cols[i % 3]:
+                            st.image(full, caption=rel, width="stretch")
+
+    #Performance tab
+    with tab_perf:
+        _render_performance_tab()
 
 
-def _target_picker(spec):
-    """Sidebar-less target selector. Returns (kind, idx, label)."""
+def _target_picker(spec, labels, force_focus=False):
+    """Returns (kind, idx, label, focus). For multilabel tasks `focus` is a
+    flag: when False the GradCAM grid view is used; when True we fall back to
+    a single-target dropdown for higher-detail inspection. `force_focus=True`
+    is used in compare mode to keep the layout sane (a 2x grid x 2 models is
+    too busy)."""
     if spec["type"] == "octdl":
         kind = st.radio("GradCAM head", ["disease", "condition"],
                         horizontal=True, format_func=str.capitalize)
-        classes = spec["disease"] if kind == "disease" else spec["condition"]
+        classes = labels[kind]
         idx = st.selectbox(f"{kind.capitalize()} class", range(len(classes)),
                            format_func=lambda i: classes[i])
-        return kind, idx, f"{kind} → {classes[idx]}"
+        return kind, idx, f"{kind} -> {classes[idx]}", False
     if spec["type"] == "single":
-        classes = spec["classes"]
+        classes = labels["classes"]
         idx = st.selectbox("Target class", range(len(classes)),
                            format_func=lambda i: classes[i])
-        return None, idx, classes[idx]
-    labels = spec["biomarkers"]
-    idx = st.selectbox("Target biomarker", range(len(labels)),
-                       format_func=lambda i: labels[i])
-    return None, idx, labels[idx]
+        return None, idx, classes[idx], False
+    biomarkers = labels["biomarkers"]
+    focus = force_focus or st.checkbox(
+        "Focus on a single biomarker",
+        value=False,
+        help="Off (default): show one GradCAM per active biomarker as a grid. "
+             "On: pick a single biomarker for higher-detail inspection.",
+    )
+    if focus:
+        idx = st.selectbox("Target biomarker", range(len(biomarkers)),
+                           format_func=lambda i: biomarkers[i])
+        return None, idx, biomarkers[idx], True
+    return None, 0, "active biomarkers (grid)", False
 
 
 def _show_task_summary(spec):
@@ -837,6 +1166,141 @@ def _show_task_summary(spec):
         st.markdown(
             f"- {len(spec['biomarkers'])} independent biomarkers: "
             f"{', '.join(spec['biomarkers'])}"
+        )
+
+
+def _render_performance_tab():
+    """Static thesis numbers, hardcoded. Organised as sub-tabs so each
+    dataset gets its run table, per-class breakdown, and external comparison
+    without overflowing the screen."""
+    st.markdown("### Performance")
+    st.caption(
+        "Numbers from the thesis report (Phases 7-12). Bold rows mark the "
+        "domain-adapted thesis result; comparison rows are external papers "
+        "or my own ImageNet baseline."
+    )
+
+    sub_overview, sub_pretrain, sub_octdl, sub_mmrdr, sub_corina, sub_oct5k = st.tabs(
+        ["Overview", "SSL pretraining",
+         "OCTDL", "MMRDR", "Corina", "OCT5k"]
+    )
+
+    with sub_overview:
+        st.markdown("#### Headline numbers per task")
+        st.markdown(_md_table(
+            ["Task", "Metric", "DA value", "Compared to"],
+            [
+                ("OCTDL",  "Disease F1 (test)",   "0.845",
+                 "ImageNet baseline 0.800; old ViT-Large SSL 0.749"),
+                ("OCTDL",  "Condition F1 (test)", "0.820",
+                 "ImageNet baseline 0.741"),
+                ("OCTDL",  "Patient-level F1",    "0.829",
+                 "Image-level 0.845 (avg-probs)"),
+                ("MMRDR",  "Macro F1",            "0.775",
+                 "RETFound (SSL 1.6 M) 0.759"),
+                ("MMRDR",  "Cohen's κ",           "0.798",
+                 "RETFound 0.803"),
+                ("MMRDR",  "F1 on NCI-DME (rare)", "0.49",
+                 "RETFound 0.436, ResNet-50 0.259"),
+                ("Corina", "Macro F1",            "0.890",
+                 "ImageNet baseline 0.707; ConvNeXt-base 87 M ≈0.86"),
+                ("Corina", "Macro AUC",           "0.970",
+                 "ImageNet baseline 0.930"),
+                ("Corina", "Exact match (4/4)",   "74.8 %",
+                 "ImageNet baseline 49.1 %"),
+                ("OCT5k",  "Macro F1",            "0.567",
+                 "ImageNet baseline 0.469 (+0.098)"),
+                ("OCT5k",  "Macro AUC",           "0.843",
+                 "ImageNet baseline 0.678 (+0.165)"),
+                ("OCT5k",  "Exact match",         "30.8 %",
+                 "ImageNet baseline 13.1 %"),
+            ],
+        ))
+
+    with sub_pretrain:
+        st.markdown("#### Frozen-feature evaluation on OCTDL_CLEANED")
+        st.caption(
+            "kNN (k=20) + linear probe at 224 px, train=1661 / test=403, "
+            "patient-stratified. The four DA rows show how pretraining "
+            "quality grows over the 30-epoch SSL run; the ImageNet row and "
+            "the old ViT-B/14 row are baselines."
+        )
+        st.markdown(_md_table(PRETRAIN_FROZEN["header"], PRETRAIN_FROZEN["rows"]))
+        st.caption(
+            "Linear-probe macro-F1 jumped +0.174 absolute (+26 %) from frozen "
+            "features alone. Largest per-class gains: RVO +0.46, NO +0.20, "
+            "DME +0.19, VID +0.17."
+        )
+
+    with sub_octdl:
+        st.markdown("#### Run comparison")
+        st.markdown(_md_table(OCTDL_RUNS["header"], OCTDL_RUNS["rows"]))
+        st.caption(
+            "Run C is the final thesis model: Disease acc 93.48 %, "
+            "balanced-acc 83.58 %, macro-F1 0.8446. Condition acc 84.20 %, "
+            "balanced-acc 84.05 %, macro-F1 0.8202. AMD F1 = 0.98, NO F1 = 0.94. "
+            "ImageNet baseline (Run E) lost 0.044 disease F1 / 0.079 condition "
+            "F1 - clean evidence of SSL value."
+        )
+
+        st.markdown("#### Patient-level evaluation")
+        st.caption(
+            "Per-image predictions grouped by patient_id, then aggregated "
+            "(majority vote or averaged probabilities). 165 test patients."
+        )
+        st.markdown(_md_table(OCTDL_PATIENT["header"], OCTDL_PATIENT["rows"]))
+
+        st.markdown("#### Data-efficiency experiment")
+        st.caption(
+            "Patient-level subsampling at 33 / 66 / 100 % of training data; "
+            "val and test fixed. DA already exceeds the 100 % ImageNet "
+            "baseline at 33 % training data on disease F1."
+        )
+        st.markdown(_md_table(OCTDL_DATAEFF["header"], OCTDL_DATAEFF["rows"]))
+
+    with sub_mmrdr:
+        st.markdown("#### Cross-dataset transfer to MMRDR")
+        st.caption(
+            "DME severity grading, 3 classes (No DME / NCI-DME / CI-DME). "
+            "NCI-DME is severely under-represented (7.5 %) and is the "
+            "hardest class. Patient-level split, train 2376 / test 562."
+        )
+        st.markdown(_md_table(MMRDR_COMPARE["header"], MMRDR_COMPARE["rows"]))
+        st.caption(
+            "Single strongest result in the thesis: with 40× less SSL "
+            "pretraining data than RETFound (the foundation model for "
+            "retinal imaging), the DA ViT-S/14 matches/beats it on macro-F1 "
+            "and on the hardest class (NCI-DME)."
+        )
+
+    with sub_corina:
+        st.markdown("#### Per-biomarker results, DA model")
+        st.caption(
+            "Patient-level split: train 2414 (38 patients) / val 268 (5) / "
+            "test 326 (9). No augmentation. BCEWithLogitsLoss with "
+            "pos_weight = neg/pos per label, threshold 0.5."
+        )
+        st.markdown(_md_table(CORINA_PER_BIO["header"], CORINA_PER_BIO["rows"]))
+
+        st.markdown("#### DA vs ImageNet vs ConvNeXt-base reference")
+        st.markdown(_md_table(CORINA_VS["header"], CORINA_VS["rows"]))
+        st.caption(
+            "Largest single-biomarker gap on HF (DA 0.92 vs IN 0.55). "
+            "Multi-label exact-match jumped from 49.1 % to 74.8 %."
+        )
+
+    with sub_oct5k:
+        st.markdown("#### Per-biomarker DA vs ImageNet")
+        st.caption(
+            "AMD/DRUSEN patients only. Patient-level 80/10/10 split: "
+            "train 399 (42 patients) / val 60 (6) / test 107 (12). "
+            "Fluid dropped (<15 positives); 8 active biomarkers."
+        )
+        st.markdown(_md_table(OCT5K_PER_BIO["header"], OCT5K_PER_BIO["rows"]))
+        st.caption(
+            "Largest gains on the morphologically subtle features "
+            "(RD +0.19, HD +0.18). Small dataset limits absolute scores; "
+            "the relative DA advantage is the point."
         )
 
 

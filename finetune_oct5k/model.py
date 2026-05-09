@@ -23,7 +23,7 @@ def load_backbone(arch, checkpoint, device):
     print(f"[MODEL] {arch}: {len(model_keys)} params")
 
     if checkpoint is None:
-        print(f"[MODEL] No checkpoint → ImageNet baseline")
+        print(f"[MODEL] No checkpoint - ImageNet baseline")
         return model.to(device)
 
     if not os.path.isfile(checkpoint):
@@ -90,14 +90,14 @@ def load_backbone(arch, checkpoint, device):
         print(f"[FATAL] Zero keys loaded!")
         sys.exit(1)
 
-    print(f"[MODEL] Loaded {loaded}/{len(model_keys)} keys ✓")
+    print(f"[MODEL] Loaded {loaded}/{len(model_keys)} keys")
     print(f"{'='*60}\n")
     return model.to(device)
 
 
 class OCT5kModel(nn.Module):
     """
-    Multi-label classifier: DINOv2 backbone → MLP → 4 sigmoid outputs.
+    Multi-label classifier: DINOv2 backbone - MLP - 4 sigmoid outputs.
 
     Key difference from OCTDL/MMRDR: output is 4 INDEPENDENT binary
     predictions (each can be 0 or 1), NOT mutually exclusive classes.
@@ -123,8 +123,6 @@ class OCT5kModel(nn.Module):
                     if name.startswith("norm."):
                         param.requires_grad = True
 
-        # Single head with num_labels outputs (NOT num_classes)
-        # Each output is an independent logit → sigmoid → binary prediction
         self.head = nn.Sequential(
             nn.Linear(self.EMBED_DIM, head_hidden),
             nn.BatchNorm1d(head_hidden),

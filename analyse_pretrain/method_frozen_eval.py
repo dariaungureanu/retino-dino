@@ -1,6 +1,6 @@
 """
-Method — Frozen Feature Evaluation (kNN + Linear Probe)
-==========================================================
+Method - Frozen Feature Evaluation (kNN + Linear Probe)
+
 Purpose:
     Quantitatively measure the quality of features learned by the DINOv2
     backbone, WITHOUT any fine-tuning. The backbone is completely frozen;
@@ -63,15 +63,10 @@ from analyse_shared import (
     load_model, get_device, IMAGENET_MEAN, IMAGENET_STD, DEFAULT_ARCH,
 )
 
-
-# ──────────────────────────────────────────────────────────────
-# Dataset (simplified for Method 3 — no raw image needed)
-# ──────────────────────────────────────────────────────────────
-
 class FeatureExtractionDataset(Dataset):
     """
     Lightweight dataset for frozen feature extraction.
-    Returns only (normalized_tensor, label_string) — no raw image
+    Returns only (normalized_tensor, label_string) - no raw image
     since we don't need visualizations here.
     """
 
@@ -92,10 +87,6 @@ class FeatureExtractionDataset(Dataset):
         return self.transform(img), self.labels[idx]
 
 
-# ──────────────────────────────────────────────────────────────
-# Data loading with patient-aware splitting
-# ──────────────────────────────────────────────────────────────
-
 def load_and_split_data(
     csv_path: str,
     image_root: str,
@@ -115,7 +106,6 @@ def load_and_split_data(
     df = pd.read_csv(csv_path)
     print(f"[DATA] CSV loaded: {len(df)} rows")
 
-    # Validate columns
     if label_col not in df.columns:
         available = [c for c in df.columns if "label" in c.lower() or "disease" in c.lower()]
         raise ValueError(
@@ -123,12 +113,10 @@ def load_and_split_data(
             f"Available candidates: {available}"
         )
 
-    # Resolve image paths
     paths, labels = [], []
     missing = 0
     for _, row in df.iterrows():
         fname = str(row[path_col]).strip()
-        # OCTDL_Cleaned layout: bare filename → prepend disease folder
         if "/" not in fname and "\\" not in fname and "disease" in df.columns:
             fname = os.path.join(str(row["disease"]), fname)
         full_path = os.path.join(image_root, fname)
@@ -144,16 +132,13 @@ def load_and_split_data(
         print(f"[DATA] WARNING: {missing} images not found, skipped")
     print(f"[DATA] Resolved {len(paths)} images across {len(set(labels))} classes")
 
-    # Class distribution
     unique, counts = np.unique(labels, return_counts=True)
     for cls, cnt in sorted(zip(unique, counts), key=lambda x: -x[1]):
         print(f"[DATA]   {cls}: {cnt} ({cnt/len(labels):.1%})")
 
-    # Split: patient-wise if possible
     if "patient_id" in df.columns:
         print(f"[DATA] Using patient-wise stratified split (no data leakage)")
-        # Build patient → label mapping (majority vote)
-        valid_df = df.iloc[:len(paths)].copy()  # only rows with valid images
+        valid_df = df.iloc[:len(paths)].copy()
         valid_df["_path"] = paths
         valid_df["_label"] = labels
 

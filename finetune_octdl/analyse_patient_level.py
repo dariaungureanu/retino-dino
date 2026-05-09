@@ -237,7 +237,7 @@ def main():
     print(f"\n  --- Per-Patient Scan Accuracy ---")
     print(f"  (What fraction of each patient's scans were correctly classified?)")
     for _, row in pat_df.sort_values("scan_accuracy").iterrows():
-        status = "✓" if row["pred_disease_vote"] == row["true_disease"] else "✗"
+        status = "ok" if row["pred_disease_vote"] == row["true_disease"] else "no"
         print(f"  {status} Patient {row['patient_id']:>6}: "
               f"{row['scan_accuracy']:.0%} ({row['n_scans']} scans) "
               f"True={row['true_disease_name']:>4} Pred={row['pred_disease_vote_name']:>4}")

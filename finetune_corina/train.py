@@ -356,7 +356,7 @@ def main():
                 "num_labels": NUM_LABELS,
                 "biomarkers": BIOMARKERS,
             }, save_path)
-            print(f"  ✓ New best! Saved → {save_path}")
+            print(f" New best! Saved → {save_path}")
         else:
             patience_counter += 1
             if patience_counter >= args.patience:

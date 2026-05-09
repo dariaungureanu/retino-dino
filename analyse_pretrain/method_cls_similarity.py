@@ -117,7 +117,7 @@ def compute_cls_patch_similarity(
     patch_tokens = F.normalize(patch_tokens, dim=-1)    # [B, N, D]
 
     # Cosine similarity = dot product of unit vectors
-    # [B, N, D] × [B, D, 1] → [B, N, 1] → [B, N]
+    # [B, N, D] × [B, D, 1] -> [B, N, 1] -> [B, N]
     similarity = torch.bmm(
         patch_tokens, cls_token.unsqueeze(-1)
     ).squeeze(-1)  # [B, N]
@@ -276,11 +276,11 @@ def main():
         print(f"[RESULT] Avg cosine similarity: {avg_mean:.4f} ± {avg_std:.4f}")
         print(f"[RESULT] Interpretation:")
         if avg_std > 0.10:
-            print(f"[RESULT]   High variance → CLS is selective (good for classification)")
+            print(f"[RESULT]   High variance -> CLS is selective (good for classification)")
         elif avg_std > 0.05:
-            print(f"[RESULT]   Moderate variance → CLS has some spatial preference")
+            print(f"[RESULT]   Moderate variance -> CLS has some spatial preference")
         else:
-            print(f"[RESULT]   Low variance → CLS attends broadly (may lack focus)")
+            print(f"[RESULT]   Low variance -> CLS attends broadly (may lack focus)")
 
     checkpoint_label = args.checkpoint or "ImageNet baseline (no checkpoint)"
     result = {

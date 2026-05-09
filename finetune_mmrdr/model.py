@@ -104,7 +104,7 @@ def load_backbone(arch, checkpoint, device):
         print(f"[FATAL] Zero keys loaded!")
         sys.exit(1)
 
-    print(f"[MODEL] Loaded {loaded}/{len(model_keys)} keys ✓")
+    print(f"[MODEL] Loaded {loaded}/{len(model_keys)} keys")
     print(f"{'='*60}\n")
     return model.to(device)
 

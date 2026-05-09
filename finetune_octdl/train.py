@@ -419,7 +419,7 @@ def main():
                 "disease_map": disease_map,
                 "condition_map": condition_map,
             }, save_path)
-            print(f"  ✓ New best! Saved → {save_path}")
+            print(f"  New best! Saved → {save_path}")
         else:
             patience_counter += 1
             if patience_counter >= args.patience:

@@ -327,7 +327,7 @@ def main():
                 "config": vars(args),
                 "num_classes": num_classes,
             }, save_path)
-            print(f"  ✓ New best! Saved → {save_path}")
+            print(f" New best! Saved → {save_path}")
         else:
             patience_counter += 1
             if patience_counter >= args.patience:

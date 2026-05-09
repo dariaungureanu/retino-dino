@@ -154,7 +154,7 @@ def load_backbone(
     elif loaded < len(model_keys) * 0.9:
         print(f"\n[WARN] Partial load: {loaded}/{len(model_keys)}")
     else:
-        print(f"\n[MODEL] ✓ Domain-adapted weights loaded successfully")
+        print(f"\n[MODEL] Domain-adapted weights loaded successfully")
 
     print(f"{'='*60}\n")
     return model.to(device)

@@ -217,7 +217,7 @@ def generate_per_biomarker_gradcam(model, dataset, sample_indices,
 
             vis = show_cam_on_image(rgb_img, cam_map, use_rgb=True)
 
-            true_val = "✓" if true_labels[j] == 1 else "✗"
+            true_val = "ok" if true_labels[j] == 1 else "no"
             pred_val = f"{probs[j]:.2f}"
 
             axes[i, j + 1].imshow(vis)

@@ -223,7 +223,7 @@ def train_and_evaluate(
             best_val_f1 = v_d["macro_f1"]
             best_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
             patience_counter = 0
-            marker = "✓"
+            marker = "ok"
         else:
             patience_counter += 1
             marker = ""

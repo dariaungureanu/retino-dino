@@ -1,11 +1,5 @@
 """
 Shared utilities for DINOv2 pretraining analysis methods.
-==========================================================
-Contains: model loading (with checkpoint diagnostics), dataset,
-sample building, and common constants.
-
-Import in each method script:
-    from analyse_shared import load_model, build_samples, OCTDataset, Sample
 """
 
 import os
@@ -22,21 +16,11 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 
 
-# ──────────────────────────────────────────────────────────────
-# Constants
-# ──────────────────────────────────────────────────────────────
-
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
 
-# DINOv2 ViT-S/14 canonical eval resolution: 518 = 37 * 14
 DEFAULT_IMG_SIZE = 518
 DEFAULT_ARCH = "dinov2_vits14"
-
-
-# ──────────────────────────────────────────────────────────────
-# Data
-# ──────────────────────────────────────────────────────────────
 
 @dataclass
 class Sample:
@@ -69,7 +53,6 @@ def build_samples(
     for _, row in df.iterrows():
         rel = str(row[path_col]).strip()
 
-        # OCTDL_Cleaned layout: bare filename → prepend disease folder
         if "/" not in rel and "\\" not in rel and "disease" in df.columns:
             rel = os.path.join(str(row["disease"]), rel)
 
@@ -118,11 +101,6 @@ class OCTDataset(Dataset):
         img = Image.open(s.image_path).convert("RGB")
         return self.normalize(img), self.raw(img), s.image_path, s.label
 
-
-# ──────────────────────────────────────────────────────────────
-# Model loading with full diagnostics
-# ──────────────────────────────────────────────────────────────
-
 def load_model(
     arch: str,
     checkpoint: Optional[str],
@@ -144,20 +122,20 @@ def load_model(
     print(f"  MODEL LOADING DIAGNOSTICS")
     print(f"{'=' * 60}")
 
-    # Step 1 — Load hub model (comes with ImageNet pretrained weights)
+    #Load hub model (comes with ImageNet pretrained weights)
     print(f"[MODEL] Architecture: {arch}")
     model = torch.hub.load("facebookresearch/dinov2", arch)
     model_keys = set(model.state_dict().keys())
     print(f"[MODEL] Hub model has {len(model_keys)} parameter tensors")
 
-    # Step 2 — No checkpoint → return ImageNet baseline
+    #No checkpoint - return ImageNet baseline
     if checkpoint is None:
-        print(f"[MODEL] No checkpoint → using ORIGINAL ImageNet weights (baseline)")
+        print(f"[MODEL] No checkpoint - using ORIGINAL ImageNet weights (baseline)")
         print(f"{'=' * 60}\n")
         model.eval().to(device)
         return model
 
-    # Step 3 — Load checkpoint
+    #Load checkpoint
     if not os.path.isfile(checkpoint):
         print(f"[FATAL] Checkpoint file not found: {checkpoint}")
         sys.exit(1)
@@ -171,23 +149,7 @@ def load_model(
 
     print(f"[MODEL] Top-level keys: {list(ckpt.keys())}")
 
-    # Step 4 — Extract the right sub-dict
-    # Official DINOv2 repo saves checkpoints in different formats:
-    #
-    # Format A (FSDP / single-GPU official):
-    #   ckpt = {"model": {"student.backbone.cls_token": ...,
-    #                      "teacher.backbone.cls_token": ...,
-    #                      "dino_loss.center": ..., ...},
-    #           "optimizer": ..., "iteration": ...}
-    #   → All components flat under "model" with full dotted prefixes
-    #
-    # Format B (some custom saves):
-    #   ckpt = {"teacher": {"backbone.cls_token": ..., "dino_head.mlp.0.weight": ...},
-    #           "student": {...}}
-    #   → Teacher/student as separate top-level dicts
-    #
-    # We always want the TEACHER backbone (EMA-smoothed, higher quality).
-
+    #Extract the right sub-dict
     if "model" in ckpt:
         st = ckpt["model"]
         print(f"[MODEL] Extracted 'model' sub-dict ({len(st)} keys)")
@@ -201,15 +163,12 @@ def load_model(
         st = ckpt
         print(f"[MODEL] No recognized sub-dict, using top-level")
 
-    # Show raw keys for debugging
     raw_keys = list(st.keys())[:10]
     print(f"[MODEL] Raw keys (first 10):")
     for k in raw_keys:
         print(f"[MODEL]   {k}")
 
-    # Step 5 — Extract teacher backbone keys and strip prefix
-    # We try multiple known prefix patterns in priority order.
-    # The first pattern that yields matches wins.
+    #Extract teacher backbone keys and strip prefix
     PREFIX_PATTERNS = [
         "teacher.backbone.",   # Format A: flat model dict (official FSDP save)
         "backbone.",           # Format B: already inside teacher sub-dict
@@ -230,7 +189,6 @@ def load_model(
             elif prefix == "" and not any(k.startswith(p) for p in ["dino_loss", "ibot_patch_loss"]):
                 candidate[k] = v
 
-        # Check if this prefix gives us keys that match the model
         if candidate:
             overlap = set(candidate.keys()) & model_keys
             if len(overlap) > len(model_keys) * 0.5:
@@ -238,7 +196,6 @@ def load_model(
                 matched_prefix = prefix
                 break
 
-    # If no pattern matched well, fall back to teacher.backbone.* with forced extraction
     if not clean:
         print(f"[MODEL] No prefix pattern matched cleanly. Trying teacher.backbone.* forcefully...")
         for k, v in st.items():
@@ -251,32 +208,26 @@ def load_model(
     print(f"[MODEL] Matched prefix: '{matched_prefix}'")
     print(f"[MODEL] Cleaned keys ({len(clean)} total, first 5): {list(clean.keys())[:5]}")
 
-    # Step 5b — Interpolate pos_embed if resolution mismatch
-    # Checkpoint was trained at 224px → pos_embed shape [1, 257, 384] (256 patches + CLS)
-    # Hub model may be initialized at 518px → pos_embed shape [1, 1370, 384] (1369 patches + CLS)
-    # We interpolate the checkpoint's pos_embed to match the model's expected resolution.
     if "pos_embed" in clean and "pos_embed" in model_keys:
-        ckpt_pos = clean["pos_embed"]              # [1, N_ckpt, D]
-        model_pos = model.state_dict()["pos_embed"] # [1, N_model, D]
+        ckpt_pos = clean["pos_embed"]
+        model_pos = model.state_dict()["pos_embed"]
 
         if ckpt_pos.shape != model_pos.shape:
             print(f"[MODEL] pos_embed shape mismatch: checkpoint {list(ckpt_pos.shape)} "
                   f"vs model {list(model_pos.shape)}")
 
-            # Separate CLS token (position 0) from patch positions
-            cls_token_pos = ckpt_pos[:, :1, :]     # [1, 1, D]
-            patch_pos = ckpt_pos[:, 1:, :]          # [1, N_patches_ckpt, D]
+            cls_token_pos = ckpt_pos[:, :1, :]
+            patch_pos = ckpt_pos[:, 1:, :]
 
             n_patches_ckpt = patch_pos.shape[1]
-            n_patches_model = model_pos.shape[1] - 1  # subtract CLS
+            n_patches_model = model_pos.shape[1] - 1
 
-            grid_ckpt = int(n_patches_ckpt ** 0.5)    # e.g., 16 for 224px
-            grid_model = int(n_patches_model ** 0.5)   # e.g., 37 for 518px
+            grid_ckpt = int(n_patches_ckpt ** 0.5)
+            grid_model = int(n_patches_model ** 0.5)
 
-            print(f"[MODEL] Interpolating pos_embed: {grid_ckpt}×{grid_ckpt} → "
-                  f"{grid_model}×{grid_model}")
+            print(f"[MODEL] Interpolating pos_embed: {grid_ckpt}x{grid_ckpt} -> "
+                  f"{grid_model}x{grid_model}")
 
-            # Reshape to 2D grid, interpolate, reshape back
             d = patch_pos.shape[-1]
             patch_pos = patch_pos.reshape(1, grid_ckpt, grid_ckpt, d).permute(0, 3, 1, 2)
             patch_pos = F.interpolate(
@@ -287,28 +238,26 @@ def load_model(
             )
             patch_pos = patch_pos.permute(0, 2, 3, 1).reshape(1, -1, d)
 
-            # Recombine CLS + interpolated patch positions
             clean["pos_embed"] = torch.cat([cls_token_pos, patch_pos], dim=1)
             print(f"[MODEL] pos_embed interpolated: {list(clean['pos_embed'].shape)}")
         else:
             print(f"[MODEL] pos_embed shape matches: {list(ckpt_pos.shape)}")
 
-    # Step 6 — Load weights and report
+    #Load weights and report
     result = model.load_state_dict(clean, strict=False)
 
     loaded = len(model_keys) - len(result.missing_keys)
     total = len(model_keys)
 
-    print(f"\n[MODEL] ── Result ──")
+    print(f"\n[MODEL] Result ")
     print(f"[MODEL] Loaded: {loaded}/{total} keys")
 
     if result.missing_keys:
         print(f"[MODEL] Missing (first 5): {result.missing_keys[:5]}")
     if result.unexpected_keys:
-        # dino_head.*, ibot_head.* are expected — SSL heads not in backbone
         print(f"[MODEL] Unexpected (first 5): {result.unexpected_keys[:5]}")
 
-    # Step 7 — Abort if nothing loaded
+    #Abort if nothing loaded
     if loaded == 0:
         print(f"\n[FATAL] Zero keys loaded! Model has ImageNet weights, not yours!")
         print(f"[FATAL] Likely cause: key prefix mismatch")
@@ -316,16 +265,12 @@ def load_model(
     elif loaded < total * 0.9:
         print(f"\n[WARN] Only {loaded}/{total} keys — partial load")
     else:
-        print(f"\n[MODEL] ✓ Domain-adapted weights loaded successfully")
+        print(f"\n[MODEL] Domain-adapted weights loaded successfully")
 
     print(f"{'=' * 60}\n")
     model.eval().to(device)
     return model
 
-
-# ──────────────────────────────────────────────────────────────
-# Common argument helpers
-# ──────────────────────────────────────────────────────────────
 
 def add_common_args(parser):
     """Add arguments shared across all analysis methods."""
@@ -363,5 +308,5 @@ def validate_img_size(img_size: int, patch_size: int = 14):
         print(f"[WARN] img_size={img_size} not divisible by {patch_size}. "
               f"Positional embeddings will be interpolated.")
     grid = img_size // patch_size
-    print(f"[INFO] Resolution {img_size}×{img_size} → {grid}×{grid} = {grid**2} patches")
+    print(f"[INFO] Resolution {img_size}x{img_size} -> {grid}x{grid} = {grid**2} patches")
     return grid

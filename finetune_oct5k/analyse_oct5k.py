@@ -252,7 +252,7 @@ def generate_gradcam_with_bbox(
             logits = model(img_input)
             prob = torch.sigmoid(logits[0, biomarker_idx]).item()
 
-        true_val = "✓" if true_labels[biomarker_idx] == 1 else "✗"
+        true_val = "ok" if true_labels[biomarker_idx] == 1 else "no"
 
         # GradCAM
         cam_map = cam(input_tensor=img_input,
