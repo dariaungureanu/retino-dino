@@ -42,11 +42,11 @@ def build_samples(
     and images are stored in image_root/<disease>/filename.jpg.
     """
     df = pd.read_csv(csv_path)
-    print(f"[DATA] CSV loaded: {len(df)} rows from {csv_path}")
+    print(f"CSV loaded: {len(df)} rows from {csv_path}")
 
     if split_col and split_name:
         df = df[df[split_col] == split_name].copy()
-        print(f"[DATA] Filtered {split_col}=={split_name}: {len(df)} rows remain")
+        print(f"Filtered {split_col}=={split_name}: {len(df)} rows remain")
 
     samples = []
     missing = 0
@@ -67,8 +67,8 @@ def build_samples(
         ))
 
     if missing > 0:
-        print(f"[DATA] WARNING: {missing} images not found on disk, skipped")
-    print(f"[DATA] Built {len(samples)} samples")
+        print(f"WARNING: {missing} images not found on disk, skipped")
+    print(f"Built {len(samples)} samples")
     return samples
 
 
@@ -106,75 +106,54 @@ def load_model(
     checkpoint: Optional[str],
     device: torch.device,
 ) -> torch.nn.Module:
-    """
-    Load DINOv2 backbone from torch.hub, optionally overwriting weights
-    from a continual-pretraining checkpoint.
-
-    Args:
-        arch:       Hub model name (e.g., "dinov2_vits14")
-        checkpoint: Path to .pth checkpoint, or None for ImageNet baseline
-        device:     Target device
-
-    Returns:
-        Model in eval mode on the specified device.
-    """
-    print(f"\n{'=' * 60}")
-    print(f"  MODEL LOADING DIAGNOSTICS")
-    print(f"{'=' * 60}")
-
-    #Load hub model (comes with ImageNet pretrained weights)
-    print(f"[MODEL] Architecture: {arch}")
+    print("  MODEL LOADING DIAGNOSTICS")
+    print(f"Architecture: {arch}")
     model = torch.hub.load("facebookresearch/dinov2", arch)
     model_keys = set(model.state_dict().keys())
-    print(f"[MODEL] Hub model has {len(model_keys)} parameter tensors")
+    print(f"Hub model has {len(model_keys)} parameter tensors")
 
-    #No checkpoint - return ImageNet baseline
     if checkpoint is None:
-        print(f"[MODEL] No checkpoint - using ORIGINAL ImageNet weights (baseline)")
-        print(f"{'=' * 60}\n")
+        print("No checkpoint - using ORIGINAL ImageNet weights (baseline)")
         model.eval().to(device)
         return model
 
-    #Load checkpoint
     if not os.path.isfile(checkpoint):
-        print(f"[FATAL] Checkpoint file not found: {checkpoint}")
+        print(f"Checkpoint file not found: {checkpoint}")
         sys.exit(1)
 
-    print(f"[MODEL] Checkpoint: {checkpoint}")
+    print(f"Checkpoint: {checkpoint}")
     ckpt = torch.load(checkpoint, map_location="cpu")
 
     if not isinstance(ckpt, dict):
-        print(f"[FATAL] Expected dict, got {type(ckpt)}")
+        print(f"Expected dict, got {type(ckpt)}")
         sys.exit(1)
 
-    print(f"[MODEL] Top-level keys: {list(ckpt.keys())}")
+    print(f"Top-level keys: {list(ckpt.keys())}")
 
-    #Extract the right sub-dict
     if "model" in ckpt:
         st = ckpt["model"]
-        print(f"[MODEL] Extracted 'model' sub-dict ({len(st)} keys)")
+        print(f"Extracted 'model' sub-dict ({len(st)} keys)")
     elif "teacher" in ckpt:
         st = ckpt["teacher"]
-        print(f"[MODEL] Extracted 'teacher' sub-dict ({len(st)} keys)")
+        print(f"Extracted 'teacher' sub-dict ({len(st)} keys)")
     elif "state_dict" in ckpt:
         st = ckpt["state_dict"]
-        print(f"[MODEL] Extracted 'state_dict' sub-dict ({len(st)} keys)")
+        print(f"Extracted 'state_dict' sub-dict ({len(st)} keys)")
     else:
         st = ckpt
-        print(f"[MODEL] No recognized sub-dict, using top-level")
+        print("No recognized sub-dict, using top-level")
 
     raw_keys = list(st.keys())[:10]
-    print(f"[MODEL] Raw keys (first 10):")
+    print("Raw keys (first 10):")
     for k in raw_keys:
-        print(f"[MODEL]   {k}")
+        print(f"{k}")
 
-    #Extract teacher backbone keys and strip prefix
     PREFIX_PATTERNS = [
-        "teacher.backbone.",   # Format A: flat model dict (official FSDP save)
-        "backbone.",           # Format B: already inside teacher sub-dict
-        "module.backbone.",    # Format B + DDP wrapping
-        "module.",             # Bare DDP wrapping (no backbone nesting)
-        "",                    # Keys already clean (e.g., manually saved backbone)
+        "teacher.backbone.",
+        "backbone.",
+        "module.backbone.",
+        "module.",
+        "",
     ]
 
     clean = {}
@@ -197,7 +176,7 @@ def load_model(
                 break
 
     if not clean:
-        print(f"[MODEL] No prefix pattern matched cleanly. Trying teacher.backbone.* forcefully...")
+        print("No prefix pattern matched cleanly. Trying teacher.backbone.* forcefully...")
         for k, v in st.items():
             for prefix in ["teacher.backbone.", "student.backbone.", "backbone.", "module."]:
                 if k.startswith(prefix):
@@ -205,15 +184,15 @@ def load_model(
                     matched_prefix = prefix
                     break
 
-    print(f"[MODEL] Matched prefix: '{matched_prefix}'")
-    print(f"[MODEL] Cleaned keys ({len(clean)} total, first 5): {list(clean.keys())[:5]}")
+    print(f"Matched prefix: '{matched_prefix}'")
+    print(f"Cleaned keys ({len(clean)} total, first 5): {list(clean.keys())[:5]}")
 
     if "pos_embed" in clean and "pos_embed" in model_keys:
         ckpt_pos = clean["pos_embed"]
         model_pos = model.state_dict()["pos_embed"]
 
         if ckpt_pos.shape != model_pos.shape:
-            print(f"[MODEL] pos_embed shape mismatch: checkpoint {list(ckpt_pos.shape)} "
+            print(f"pos_embed shape mismatch: checkpoint {list(ckpt_pos.shape)} "
                   f"vs model {list(model_pos.shape)}")
 
             cls_token_pos = ckpt_pos[:, :1, :]
@@ -225,7 +204,7 @@ def load_model(
             grid_ckpt = int(n_patches_ckpt ** 0.5)
             grid_model = int(n_patches_model ** 0.5)
 
-            print(f"[MODEL] Interpolating pos_embed: {grid_ckpt}x{grid_ckpt} -> "
+            print(f"Interpolating pos_embed: {grid_ckpt}x{grid_ckpt} -> "
                   f"{grid_model}x{grid_model}")
 
             d = patch_pos.shape[-1]
@@ -239,35 +218,32 @@ def load_model(
             patch_pos = patch_pos.permute(0, 2, 3, 1).reshape(1, -1, d)
 
             clean["pos_embed"] = torch.cat([cls_token_pos, patch_pos], dim=1)
-            print(f"[MODEL] pos_embed interpolated: {list(clean['pos_embed'].shape)}")
+            print(f"pos_embed interpolated: {list(clean['pos_embed'].shape)}")
         else:
-            print(f"[MODEL] pos_embed shape matches: {list(ckpt_pos.shape)}")
+            print(f"pos_embed shape matches: {list(ckpt_pos.shape)}")
 
-    #Load weights and report
     result = model.load_state_dict(clean, strict=False)
 
     loaded = len(model_keys) - len(result.missing_keys)
     total = len(model_keys)
 
-    print(f"\n[MODEL] Result ")
-    print(f"[MODEL] Loaded: {loaded}/{total} keys")
+    print("\nResult ")
+    print(f"Loaded: {loaded}/{total} keys")
 
     if result.missing_keys:
-        print(f"[MODEL] Missing (first 5): {result.missing_keys[:5]}")
+        print(f"Missing (first 5): {result.missing_keys[:5]}")
     if result.unexpected_keys:
-        print(f"[MODEL] Unexpected (first 5): {result.unexpected_keys[:5]}")
+        print(f"Unexpected (first 5): {result.unexpected_keys[:5]}")
 
-    #Abort if nothing loaded
     if loaded == 0:
-        print(f"\n[FATAL] Zero keys loaded! Model has ImageNet weights, not yours!")
-        print(f"[FATAL] Likely cause: key prefix mismatch")
+        print("\nZero keys loaded! Model has ImageNet weights, not yours!")
+        print("Likely cause: key prefix mismatch")
         sys.exit(1)
     elif loaded < total * 0.9:
-        print(f"\n[WARN] Only {loaded}/{total} keys - partial load")
+        print(f"\nOnly {loaded}/{total} keys - partial load")
     else:
-        print(f"\n[MODEL] Domain-adapted weights loaded successfully")
+        print("\nDomain-adapted weights loaded successfully")
 
-    print(f"{'=' * 60}\n")
     model.eval().to(device)
     return model
 
@@ -278,7 +254,7 @@ def add_common_args(parser):
     g.add_argument("--arch", default=DEFAULT_ARCH,
                    help="DINOv2 hub architecture (must match checkpoint)")
     g.add_argument("--checkpoint", default=None,
-                   help="Domain-adapted checkpoint. Omit for ImageNet baseline.")
+                   help="Domain-adapted checkpoint. Omit for ImageNet baseline")
 
     g = parser.add_argument_group("Data")
     g.add_argument("--csv", required=True, help="Path to metadata CSV")
@@ -299,14 +275,14 @@ def add_common_args(parser):
 
 def get_device():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"[INFO] Device: {device}")
+    print(f"Device: {device}")
     return device
 
 
 def validate_img_size(img_size: int, patch_size: int = 14):
     if img_size % patch_size != 0:
-        print(f"[WARN] img_size={img_size} not divisible by {patch_size}. "
-              f"Positional embeddings will be interpolated.")
+        print(f"img_size={img_size} not divisible by {patch_size}. "
+              "Positional embeddings will be interpolated.")
     grid = img_size // patch_size
-    print(f"[INFO] Resolution {img_size}x{img_size} -> {grid}x{grid} = {grid**2} patches")
+    print(f"Resolution {img_size}x{img_size} -> {grid}x{grid} = {grid**2} patches")
     return grid

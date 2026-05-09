@@ -41,7 +41,7 @@ import argparse
 import json
 import os
 from typing import List, Dict
-
+from PIL import Image
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -80,7 +80,7 @@ def compute_cls_patch_similarity(
     if not required.issubset(feats.keys()):
         available = set(feats.keys())
         raise RuntimeError(
-            f"forward_features missing required keys.\n"
+            "forward_features missing required keys.\n"
             f"  Required: {required}\n"
             f"  Available: {available}"
         )
@@ -93,7 +93,7 @@ def compute_cls_patch_similarity(
 
     similarity = torch.bmm(
         patch_tokens, cls_token.unsqueeze(-1)
-    ).squeeze(-1)  # [B, N]
+    ).squeeze(-1)
 
     return similarity
 
@@ -109,35 +109,25 @@ def save_similarity_map(
     overlay_alpha: float = 0.45,
 ):
 
-    # Reshape to spatial grid
     sim_grid = similarity.reshape(grid_h, grid_w)
-
-    # Normalize to [0, 1] for visualization
     sim_min, sim_max = sim_grid.min(), sim_grid.max()
     sim_norm = (sim_grid - sim_min) / (sim_max - sim_min + 1e-8)
 
-    # Get raw image as numpy
     raw_np = raw_img_tensor.permute(1, 2, 0).cpu().numpy()
     h, w = raw_np.shape[:2]
 
-    # Upsample similarity map to image resolution
-    from PIL import Image
     sim_resized = np.asarray(
         Image.fromarray(np.uint8(255 * sim_norm)).resize((w, h), Image.BILINEAR)
     ).astype(np.float32) / 255.0
 
-    # Apply colormap (jet: blue=low, red=high)
     heat_rgb = plt.get_cmap("jet")(sim_resized)[..., :3]
 
-    # Blend overlay
     alpha = float(np.clip(overlay_alpha, 0.0, 1.0))
     overlay = np.clip((1.0 - alpha) * raw_np + alpha * heat_rgb, 0.0, 1.0)
 
-    # Statistics for title
     mean_sim = float(similarity.mean())
     std_sim = float(similarity.std())
 
-    # Plot
     fig, axes = plt.subplots(1, 3, figsize=(15, 4))
 
     axes[0].imshow(raw_np)
@@ -187,15 +177,13 @@ def main():
     )
     if args.max_images > 0:
         samples = samples[:args.max_images]
-        print(f"[DATA] Using first {len(samples)} images")
+        print(f"Using first {len(samples)} images")
 
     ds = OCTDataset(samples, img_size=args.img_size)
     dl = DataLoader(ds, batch_size=1, shuffle=False, num_workers=2)
 
-    # Model
     model = load_model(args.arch, args.checkpoint, device)
 
-    # Process
     records: List[Dict] = []
     all_stats = []
 
@@ -228,19 +216,18 @@ def main():
             **stats,
         })
 
-    # Summary
     if all_stats:
         avg_mean = np.mean([s["mean"] for s in all_stats])
         avg_std = np.mean([s["std"] for s in all_stats])
-        print(f"\n[RESULT] Processed {len(records)} images")
-        print(f"[RESULT] Avg cosine similarity: {avg_mean:.4f} ± {avg_std:.4f}")
-        print(f"[RESULT] Interpretation:")
+        print(f"\nProcessed {len(records)} images")
+        print(f"Avg cosine similarity: {avg_mean:.4f} ± {avg_std:.4f}")
+        print("Interpretation:")
         if avg_std > 0.10:
-            print(f"[RESULT]   High variance -> CLS is selective (good for classification)")
+            print("High variance -> CLS is selective (good for classification)")
         elif avg_std > 0.05:
-            print(f"[RESULT]   Moderate variance -> CLS has some spatial preference")
+            print("Moderate variance -> CLS has some spatial preference")
         else:
-            print(f"[RESULT]   Low variance -> CLS attends broadly (may lack focus)")
+            print("Low variance -> CLS attends broadly (may lack focus)")
 
     checkpoint_label = args.checkpoint or "ImageNet baseline (no checkpoint)"
     result = {
@@ -260,7 +247,7 @@ def main():
     os.makedirs(os.path.dirname(out_json), exist_ok=True)
     with open(out_json, "w", encoding="utf-8") as f:
         json.dump(result, f, indent=2)
-    print(f"[INFO] JSON log saved: {out_json}")
+    print(f"JSON log saved: {out_json}")
 
 
 if __name__ == "__main__":

@@ -14,7 +14,9 @@ Usage:
 
 import argparse
 import os
-
+from pytorch_grad_cam import GradCAM
+from pytorch_grad_cam.utils.image import show_cam_on_image
+from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 import numpy as np
 import torch
 import torch.nn as nn
@@ -78,14 +80,6 @@ def main():
     parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--num_workers", type=int, default=4)
     args = parser.parse_args()
-
-    try:
-        from pytorch_grad_cam import GradCAM
-        from pytorch_grad_cam.utils.image import show_cam_on_image
-        from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
-    except ImportError:
-        print("[ERROR] Install: pip install grad-cam")
-        return
 
     if args.model_path:
         model_path = args.model_path
@@ -179,7 +173,7 @@ def main():
         confs = all_conf_d[indices]
 
         if len(indices) == 0:
-            print(f"[SKIP] No correct predictions for {disease_name}")
+            print(f"No correct predictions for {disease_name}")
             continue
 
         # Top-K most confident
@@ -263,7 +257,7 @@ def main():
         save_path = os.path.join(args.out_dir, f"disease_vs_condition_{disease_name}.png")
         fig.savefig(save_path, dpi=200, bbox_inches="tight")
         plt.close(fig)
-        print(f"[SAVED] {save_path}")
+        print(f"{save_path}")
 
     print(f"\n[DONE] All outputs: {args.out_dir}")
 

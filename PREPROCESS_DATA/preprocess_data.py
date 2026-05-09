@@ -137,9 +137,7 @@ def process_images(source_root, dest_root, csv_filename):
     new_df = pd.DataFrame(valid_rows)
     output_csv_path = os.path.join(dest_root, "OCTDL_clean_metadata.csv")
     new_df.to_csv(output_csv_path, index=False)
-
-    print("------------------------------------------------")
-    print(f"Processing Complete!")
+    print("Processing Complete!")
     print(f"Original images: {len(df)}")
     print(f"Successfully processed: {len(new_df)}")
     print(f"New CSV saved at: {output_csv_path}")

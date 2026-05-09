@@ -11,7 +11,11 @@ from tqdm import tqdm
 from sklearn.manifold import TSNE
 from torch.utils.data import DataLoader
 from torchvision import transforms
-
+from pytorch_grad_cam import GradCAM
+from pytorch_grad_cam.utils.image import show_cam_on_image
+from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
+from OLD_CLASSIFIER.dataset import get_data_splits, OCTDLMultiTaskDataset
+from OLD_CLASSIFIER.model import OCTDLMultiTaskModel
 current_script_path = os.path.abspath(__file__)
 current_dir = os.path.dirname(current_script_path)
 project_root = os.path.dirname(current_dir)
@@ -28,14 +32,6 @@ SSL_CHECKPOINT_PATH = os.path.join(project_root, "checkpoints_ssl", "checkpoint_
 if CLASSIFIER_DIR not in sys.path:
     sys.path.insert(0, CLASSIFIER_DIR)
 
-try:
-    from dataset import get_data_splits, OCTDLMultiTaskDataset
-    from model import OCTDLMultiTaskModel
-
-    print("Successfully imported project modules.")
-except ImportError as e:
-    print(f"Import Error: {e}")
-    sys.exit(1)
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Running on: {DEVICE}")
@@ -227,10 +223,6 @@ def generate_cam_for_task_compare_pred_true(
       - CAM for predicted class
       - CAM for true class
     """
-    from pytorch_grad_cam import GradCAM
-    from pytorch_grad_cam.utils.image import show_cam_on_image
-    from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
-
     print(f"Generating GradCAM (pred vs true) for task: {task_name}...")
 
     for p in model.backbone.parameters():

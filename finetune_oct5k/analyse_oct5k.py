@@ -31,6 +31,9 @@ from sklearn.manifold import TSNE
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from PIL import Image
+from pytorch_grad_cam import GradCAM
+from pytorch_grad_cam.utils.image import show_cam_on_image
+from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 
 from dataset import (
     OCT5kDataset, load_oct5k_splits, get_eval_transform,
@@ -57,8 +60,8 @@ def load_model(model_path, device):
 
     model.load_state_dict(ckpt["model_state_dict"])
     model.eval()
-    print(f"[MODEL] Loaded epoch {ckpt['epoch']}, val_f1={ckpt['val_f1_macro']:.4f}")
-    print(f"[MODEL] Active biomarkers: {[SHORT_NAMES[b] for b in active_biomarkers]}")
+    print(f"Loaded epoch {ckpt['epoch']}, val_f1={ckpt['val_f1_macro']:.4f}")
+    print(f"Active biomarkers: {[SHORT_NAMES[b] for b in active_biomarkers]}")
     return model, config, active_biomarkers
 
 
@@ -122,7 +125,7 @@ def plot_tsne(features, labels, active_biomarkers, out_path):
     plt.tight_layout()
     plt.savefig(out_path, dpi=200, bbox_inches="tight")
     plt.close()
-    print(f"[SAVED] {out_path}")
+    print(f"{out_path}")
 
 
 class BiomarkerWrapper(nn.Module):
@@ -209,16 +212,8 @@ def generate_gradcam_with_bbox(
     """
     GradCAM for one biomarker with expert bounding box overlay + IoU score.
     """
-    try:
-        from pytorch_grad_cam import GradCAM
-        from pytorch_grad_cam.utils.image import show_cam_on_image
-        from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
-    except ImportError:
-        print("[ERROR] Install: pip install grad-cam")
-        return []
-
     if len(sample_indices) == 0:
-        print(f"[SKIP] No samples for: {title}")
+        print(f"No samples for: {title}")
         return []
 
     for p in model.backbone.parameters():
@@ -297,7 +292,7 @@ def generate_gradcam_with_bbox(
     plt.tight_layout()
     fig.savefig(save_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
-    print(f"[SAVED] {save_path}")
+    print(f"{save_path}")
 
     if all_ious:
         mean_iou = np.mean(all_ious)
@@ -355,7 +350,7 @@ def main():
                              num_workers=args.num_workers, pin_memory=True)
 
     bbox_df = pd.read_csv(args.bbox_csv)
-    print(f"[BBOX] Loaded {len(bbox_df)} bounding boxes")
+    print(f"Loaded {len(bbox_df)} bounding boxes")
 
     # t-SNE
     if not args.skip_tsne:
@@ -397,9 +392,7 @@ def main():
             if ious_errors:
                 all_iou_results[f"{SHORT_NAMES[bm]}_errors"] = np.mean(ious_errors)
 
-        print(f"\n{'='*60}")
-        print(f"  GRADCAM-BBOX IoU SUMMARY")
-        print(f"{'='*60}")
+        print("  GRADCAM-BBOX IoU SUMMARY")
         for key, val in sorted(all_iou_results.items()):
             print(f"  {key:>20}: IoU = {val:.3f}")
         if all_iou_results:
@@ -413,7 +406,7 @@ def main():
         import json
         with open(iou_path, "w") as f:
             json.dump(all_iou_results, f, indent=2)
-        print(f"[SAVED] {iou_path}")
+        print(f"{iou_path}")
 
     print(f"\n[DONE] All outputs: {args.out_dir}")
 

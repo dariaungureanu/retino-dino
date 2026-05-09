@@ -148,7 +148,7 @@ def subsample_train_df(train_df, fraction, random_state=42):
     )
 
     subset_df = train_df[train_df["patient_id"].isin(selected)]
-    print(f"[DATA] Subsampled: {len(subset_df)} images "
+    print(f"Subsampled: {len(subset_df)} images "
           f"({len(selected)} patients) = {fraction:.0%} of training set")
     return subset_df
 
@@ -178,7 +178,7 @@ def train_and_evaluate(
     test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE, shuffle=False,
                              num_workers=NUM_WORKERS, pin_memory=True)
 
-    # Reload the backbone for every fraction so the model starts fresh.
+    # fresh backbone per fraction
     backbone = load_backbone(ARCH, checkpoint, device)
     model = OCTDLMultiTaskModel(
         backbone=backbone,
@@ -294,7 +294,7 @@ def plot_efficiency_curve(results, fractions, out_dir, label=""):
     save_path = os.path.join(out_dir, "data_efficiency_curve.png")
     fig.savefig(save_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
-    print(f"\n[SAVED] {save_path}")
+    print(f"\n{save_path}")
 
 
 def plot_comparison(results_a_path, results_b_path, label_a, label_b, out_dir):
@@ -336,7 +336,7 @@ def plot_comparison(results_a_path, results_b_path, label_a, label_b, out_dir):
     os.makedirs(out_dir, exist_ok=True)
     fig.savefig(save_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
-    print(f"[SAVED] {save_path}")
+    print(f"{save_path}")
 
 
 def main():
@@ -344,7 +344,7 @@ def main():
 
     parser.add_argument("--data_path", type=str, default=None)
     parser.add_argument("--checkpoint", type=str, default=None,
-                        help="Domain-adapted checkpoint. Omit for ImageNet baseline.")
+                        help="Domain-adapted checkpoint. Omit for ImageNet baseline")
     parser.add_argument("--fractions", type=float, nargs="+", default=[0.33, 0.66, 1.0])
     parser.add_argument("--out_dir", type=str, default="results/data_efficiency")
     parser.add_argument("--num_workers", type=int, default=NUM_WORKERS)
@@ -369,15 +369,15 @@ def main():
         raise ValueError("--data_path is required")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"[INFO] Device: {device}")
+    print(f"Device: {device}")
     os.makedirs(args.out_dir, exist_ok=True)
 
-    # Splits are fixed across all fractions so val/test stay comparable.
+    # fixed val/test across all fractions
     csv_path = os.path.join(args.data_path, "OCTDL_clean_metadata.csv")
     train_df, val_df, test_df, disease_map, condition_map = get_data_splits(csv_path)
 
-    print(f"[DATA] Full train: {len(train_df)} | Val: {len(val_df)} | Test: {len(test_df)}")
-    print(f"[DATA] Fractions to test: {args.fractions}")
+    print(f"Full train: {len(train_df)} | Val: {len(val_df)} | Test: {len(test_df)}")
+    print(f"Fractions to test: {args.fractions}")
 
     checkpoint_label = "domain_adapted" if args.checkpoint else "imagenet_baseline"
 
@@ -403,7 +403,7 @@ def main():
     json_path = os.path.join(args.out_dir, "results.json")
     with open(json_path, "w") as f:
         json.dump(output, f, indent=2)
-    print(f"\n[SAVED] {json_path}")
+    print(f"\n{json_path}")
 
     # Plot
     plot_efficiency_curve(all_results, args.fractions, args.out_dir, label=f"({checkpoint_label})")
@@ -411,9 +411,7 @@ def main():
     # Summary table
     print(f"\n{'='*70}")
     print(f"  DATA EFFICIENCY SUMMARY - {checkpoint_label}")
-    print(f"{'='*70}")
     print(f"  {'Fraction':<10} {'N_train':<10} {'Disease F1':<12} {'Disease Acc':<12} {'Cond F1':<12}")
-    print(f"  {'-'*56}")
     for r in all_results:
         print(f"  {r['fraction']:<10.0%} {r['train_images']:<10} "
               f"{r['disease_f1']:<12.4f} {r['disease_acc']:<12.2f} {r['condition_f1']:<12.4f}")

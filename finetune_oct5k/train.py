@@ -160,10 +160,7 @@ def evaluate_test(model, loader, criterion, device, biomarkers, out_dir):
     preds = (probs >= THRESHOLD).astype(int)
     labels_np = cat_labels.cpu().numpy()
 
-    # Report
-    print(f"\n{'=' * 60}")
-    print(f"  BIOMARKER DETECTION REPORT")
-    print(f"{'=' * 60}")
+    print("  BIOMARKER DETECTION REPORT")
     for i, bm in enumerate(biomarkers):
         n_pos = int(labels_np[:, i].sum())
         n_total = len(labels_np)
@@ -202,7 +199,7 @@ def evaluate_test(model, loader, criterion, device, biomarkers, out_dir):
     cm_path = os.path.join(out_dir, "confusion_matrices.png")
     fig.savefig(cm_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
-    print(f"[SAVED] {cm_path}")
+    print(f"{cm_path}")
 
     return metrics
 
@@ -236,14 +233,14 @@ def main():
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"[INFO] Device: {device}")
+    print(f"Device: {device}")
     os.makedirs(args.save_dir, exist_ok=True)
 
     train_df, val_df, test_df, active_biomarkers = load_oct5k_splits(
         args.csv, args.data_path, drop_rare=args.drop_rare,
     )
     num_labels = len(active_biomarkers)
-    print(f"[DATA] Active biomarkers ({num_labels}): {[SHORT_NAMES[b] for b in active_biomarkers]}")
+    print(f"Active biomarkers ({num_labels}): {[SHORT_NAMES[b] for b in active_biomarkers]}")
 
     pos_weights = compute_pos_weights(train_df, active_biomarkers).to(device)
 
@@ -259,7 +256,7 @@ def main():
     test_loader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False,
                              num_workers=args.num_workers, pin_memory=True)
 
-    print(f"[DATA] Batches: train={len(train_loader)}, val={len(val_loader)}, test={len(test_loader)}")
+    print(f"Batches: train={len(train_loader)}, val={len(val_loader)}, test={len(test_loader)}")
 
     backbone = load_backbone(args.arch, args.checkpoint, device)
     model = OCT5kModel(
@@ -287,9 +284,7 @@ def main():
     patience_counter = 0
     best_epoch = 0
 
-    print(f"\n{'=' * 60}")
     print(f"  TRAINING - {args.epochs} epochs, {num_labels} biomarkers")
-    print(f"{'=' * 60}\n")
 
     for epoch in range(1, args.epochs + 1):
         t0 = time.time()
@@ -347,10 +342,7 @@ def main():
                 print(f"\n[EARLY STOP] Best: epoch {best_epoch}, F1={best_val_f1:.4f}")
                 break
 
-    print(f"\n{'=' * 60}")
     print(f"  FINAL TEST (best checkpoint: epoch {best_epoch})")
-    print(f"{'=' * 60}")
-
     best_ckpt = torch.load(os.path.join(args.save_dir, "best_model.pth"), map_location=device)
     model.load_state_dict(best_ckpt["model_state_dict"])
 
@@ -377,7 +369,7 @@ def main():
     json_path = os.path.join(args.save_dir, "results.json")
     with open(json_path, "w") as f:
         json.dump(results, f, indent=2)
-    print(f"\n[SAVED] {json_path}")
+    print(f"\n{json_path}")
     print("Done.")
 
 

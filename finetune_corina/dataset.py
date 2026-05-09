@@ -72,16 +72,16 @@ def load_corina_splits(csv_path, root_dir, val_size=0.1, random_state=42):
     Train/test is predefined. Val is carved from train (patient-stratified).
     """
     df = pd.read_csv(csv_path)
-    print(f"[DATA] Loaded {len(df)} rows from {csv_path}")
+    print(f"Loaded {len(df)} rows from {csv_path}")
 
     train_full = df[df["split"] == "train"].copy()
     test_df = df[df["split"] == "test"].copy()
 
-    print(f"[DATA] Predefined: {len(train_full)} train, {len(test_df)} test")
+    print(f"Predefined: {len(train_full)} train, {len(test_df)} test")
 
     for split_name, split_df in [("Train", train_full), ("Test", test_df)]:
         dist = {bm: int(split_df[bm].sum()) for bm in BIOMARKERS}
-        print(f"[DATA] {split_name} biomarkers: {dist}")
+        print(f"{split_name} biomarkers: {dist}")
 
     # Carve val from train at the patient level.
     train_patients = train_full[["patient_id"]].drop_duplicates()
@@ -100,7 +100,7 @@ def load_corina_splits(csv_path, root_dir, val_size=0.1, random_state=42):
         )
     except ValueError:
         # Fall back to random split if stratification fails (too few patients per class).
-        print("[WARN] Stratified val split failed, using random split")
+        print("Stratified val split failed, using random split")
         train_pat, val_pat = train_test_split(
             train_patients.index.to_numpy(),
             test_size=val_size,
@@ -110,8 +110,8 @@ def load_corina_splits(csv_path, root_dir, val_size=0.1, random_state=42):
     train_df = train_full[train_full["patient_id"].isin(train_pat)]
     val_df = train_full[train_full["patient_id"].isin(val_pat)]
 
-    print(f"[DATA] After val split: {len(train_df)} train, {len(val_df)} val, {len(test_df)} test")
-    print(f"[DATA] Patients: train={len(train_pat)}, val={len(val_pat)}, "
+    print(f"After val split: {len(train_df)} train, {len(val_df)} val, {len(test_df)} test")
+    print(f"Patients: train={len(train_pat)}, val={len(val_pat)}, "
           f"test={test_df['patient_id'].nunique()}")
 
     return train_df, val_df, test_df
@@ -129,5 +129,5 @@ def compute_pos_weights(train_df):
         n_neg = len(train_df) - n_pos
         w = n_neg / n_pos if n_pos > 0 else 1.0
         weights.append(w)
-        print(f"[WEIGHTS] {bm}: pos={int(n_pos)}, neg={int(n_neg)}, weight={w:.2f}")
+        print(f"{bm}: pos={int(n_pos)}, neg={int(n_neg)}, weight={w:.2f}")
     return torch.tensor(weights, dtype=torch.float32)

@@ -23,6 +23,9 @@ import seaborn as sns
 from sklearn.manifold import TSNE
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+from pytorch_grad_cam import GradCAM
+from pytorch_grad_cam.utils.image import show_cam_on_image
+from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 
 from dataset import (
     MMRDRDataset, load_mmrdr_splits, get_eval_transform, CLASS_NAMES,
@@ -31,12 +34,12 @@ from model import MMRDRModel, load_backbone
 
 
 def load_model(model_path, device):
-    print(f"[INFO] Loading: {model_path}")
+    print(f"Loading: {model_path}")
     ckpt = torch.load(model_path, map_location=device)
     config = ckpt["config"]
     num_classes = ckpt["num_classes"]
 
-    print(f"[INFO] arch={config['arch']}  unfreeze={config['unfreeze_last_n']}  "
+    print(f"arch={config['arch']}  unfreeze={config['unfreeze_last_n']}  "
           f"epoch={ckpt['epoch']}  val_f1={ckpt['val_f1']:.4f}")
 
     backbone = load_backbone(config["arch"], config["checkpoint"], device)
@@ -92,7 +95,7 @@ def plot_tsne(features, labels, out_path, perplexity=30):
     plt.tight_layout()
     plt.savefig(out_path, dpi=200, bbox_inches="tight")
     plt.close()
-    print(f"[SAVED] {out_path}")
+    print(f"{out_path}")
 
 
 def reshape_transform_vit(tensor):
@@ -153,16 +156,8 @@ def select_samples(y_true, y_pred, y_conf, indices, class_idx=None,
 def generate_gradcam_grid(model, dataset, sample_indices, save_path,
                           device, title="GradCAM"):
     """GradCAM grid: each row is Original | CAM for Predicted | CAM for True."""
-    try:
-        from pytorch_grad_cam import GradCAM
-        from pytorch_grad_cam.utils.image import show_cam_on_image
-        from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
-    except ImportError:
-        print("[ERROR] Install: pip install grad-cam")
-        return
-
     if len(sample_indices) == 0:
-        print(f"[SKIP] No samples for: {title}")
+        print(f"No samples for: {title}")
         return
 
     for p in model.backbone.parameters():
@@ -217,7 +212,7 @@ def generate_gradcam_grid(model, dataset, sample_indices, save_path,
     plt.tight_layout()
     fig.savefig(save_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
-    print(f"[SAVED] {save_path}")
+    print(f"{save_path}")
 
 
 def main():

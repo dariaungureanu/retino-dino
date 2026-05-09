@@ -77,17 +77,17 @@ def load_oct5k_splits(csv_path, root_dir, test_size=0.2, val_size=0.1,
     set to 15 to drop Fluid (only 14 images). None keeps everything.
     """
     df = pd.read_csv(csv_path)
-    print(f"[DATA] Loaded {len(df)} rows from {csv_path}")
+    print(f"Loaded {len(df)} rows from {csv_path}")
 
     active_biomarkers = BIOMARKERS.copy()
     if drop_rare:
         for bm in BIOMARKERS:
             if df[bm].sum() < drop_rare:
-                print(f"[DATA] Dropping {bm} (only {int(df[bm].sum())} positive images)")
+                print(f"Dropping {bm} (only {int(df[bm].sum())} positive images)")
                 active_biomarkers.remove(bm)
 
     patients = df["patient_id"].unique()
-    print(f"[DATA] {len(patients)} unique patients")
+    print(f"{len(patients)} unique patients")
 
     train_val_pat, test_pat = train_test_split(
         patients, test_size=test_size, random_state=random_state,
@@ -103,13 +103,13 @@ def load_oct5k_splits(csv_path, root_dir, test_size=0.2, val_size=0.1,
     val_df = df[df["patient_id"].isin(val_pat)]
     test_df = df[df["patient_id"].isin(test_pat)]
 
-    print(f"[DATA] Split: {len(train_df)} train ({len(train_pat)} patients), "
+    print(f"Split: {len(train_df)} train ({len(train_pat)} patients), "
           f"{len(val_df)} val ({len(val_pat)} patients), "
           f"{len(test_df)} test ({len(test_pat)} patients)")
 
     for name, split_df in [("Train", train_df), ("Val", val_df), ("Test", test_df)]:
         dist = {SHORT_NAMES[bm]: int(split_df[bm].sum()) for bm in active_biomarkers}
-        print(f"[DATA] {name}: {dist}")
+        print(f"{name}: {dist}")
 
     return train_df, val_df, test_df, active_biomarkers
 
@@ -122,5 +122,5 @@ def compute_pos_weights(train_df, biomarkers):
         n_neg = len(train_df) - n_pos
         w = n_neg / n_pos if n_pos > 0 else 1.0
         weights.append(w)
-        print(f"[WEIGHTS] {SHORT_NAMES[bm]}: pos={int(n_pos)}, neg={int(n_neg)}, weight={w:.2f}")
+        print(f"{SHORT_NAMES[bm]}: pos={int(n_pos)}, neg={int(n_neg)}, weight={w:.2f}")
     return torch.tensor(weights, dtype=torch.float32)

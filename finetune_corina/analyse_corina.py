@@ -22,7 +22,9 @@ import seaborn as sns
 from sklearn.manifold import TSNE
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-
+from pytorch_grad_cam import GradCAM
+from pytorch_grad_cam.utils.image import show_cam_on_image
+from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from dataset import (
     CorinaDataset, load_corina_splits, get_eval_transform, BIOMARKERS, NUM_LABELS,
 )
@@ -33,7 +35,7 @@ THRESHOLD = 0.5
 
 
 def load_model(model_path, device):
-    print(f"[INFO] Loading: {model_path}")
+    print(f"Loading: {model_path}")
     ckpt = torch.load(model_path, map_location=device)
     config = ckpt["config"]
 
@@ -102,7 +104,7 @@ def plot_tsne(features, labels, out_path, perplexity=30):
     plt.tight_layout()
     plt.savefig(out_path, dpi=200, bbox_inches="tight")
     plt.close()
-    print(f"[SAVED] {out_path}")
+    print(f"{out_path}")
 
 
 class BiomarkerWrapper(nn.Module):
@@ -149,16 +151,9 @@ def collect_predictions(model, loader, device):
 def generate_per_biomarker_gradcam(model, dataset, sample_indices,
                                     save_path, device, title="GradCAM"):
     """For each sample show Original + GradCAM for EACH biomarker (side by side)."""
-    try:
-        from pytorch_grad_cam import GradCAM
-        from pytorch_grad_cam.utils.image import show_cam_on_image
-        from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
-    except ImportError:
-        print("[ERROR] Install: pip install grad-cam")
-        return
 
     if len(sample_indices) == 0:
-        print(f"[SKIP] No samples for: {title}")
+        print(f"No samples for: {title}")
         return
 
     for p in model.backbone.parameters():
@@ -211,7 +206,7 @@ def generate_per_biomarker_gradcam(model, dataset, sample_indices,
     plt.tight_layout()
     fig.savefig(save_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
-    print(f"[SAVED] {save_path}")
+    print(f"{save_path}")
 
 
 def select_samples_multilabel(probs, labels, indices, biomarker_idx=None,

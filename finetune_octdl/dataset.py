@@ -64,8 +64,7 @@ class OCTDLMultiTaskDataset(Dataset):
 
         label_disease = self.disease_map[str(row["label_disease"])]
 
-        # Condition labels are optional in the CSV; missing/filtered rows get
-        # IGNORE_INDEX so the loss masks them.
+        # missing/filtered conditions get IGNORE_INDEX (masked in loss)
         cond_str = str(row["label_condition_raw"])
         label_condition = self.condition_map.get(cond_str, IGNORE_INDEX)
 
@@ -75,7 +74,7 @@ class OCTDLMultiTaskDataset(Dataset):
 def get_data_splits(csv_path, test_size=0.2, val_size=0.1, random_state=42):
     """Patient-stratified split into train/val/test DataFrames."""
     df = pd.read_csv(csv_path)
-    print(f"[DATA] Loaded {len(df)} rows from {csv_path}")
+    print(f"Loaded {len(df)} rows from {csv_path}")
 
     unique_diseases = sorted(df["label_disease"].astype(str).unique())
     disease_map = {name: i for i, name in enumerate(unique_diseases)}
@@ -85,8 +84,8 @@ def get_data_splits(csv_path, test_size=0.2, val_size=0.1, random_state=42):
     ].unique()
     condition_map = {name: i for i, name in enumerate(sorted(valid_conds))}
 
-    print(f"[DATA] Disease classes ({len(disease_map)}): {disease_map}")
-    print(f"[DATA] Condition classes ({len(condition_map)}): {condition_map}")
+    print(f"Disease classes ({len(disease_map)}): {disease_map}")
+    print(f"Condition classes ({len(condition_map)}): {condition_map}")
 
     patients = df[["patient_id", "label_disease"]].drop_duplicates()
     total_held_out = test_size + val_size
@@ -105,9 +104,9 @@ def get_data_splits(csv_path, test_size=0.2, val_size=0.1, random_state=42):
     val_df   = df[df["patient_id"].isin(val_pat["patient_id"])]
     test_df  = df[df["patient_id"].isin(test_pat["patient_id"])]
 
-    print(f"[DATA] Train: {len(train_df)} imgs ({len(train_pat)} patients)")
-    print(f"[DATA] Val:   {len(val_df)} imgs ({len(val_pat)} patients)")
-    print(f"[DATA] Test:  {len(test_df)} imgs ({len(test_pat)} patients)")
+    print(f"Train: {len(train_df)} imgs ({len(train_pat)} patients)")
+    print(f"Val:   {len(val_df)} imgs ({len(val_pat)} patients)")
+    print(f"Test:  {len(test_df)} imgs ({len(test_pat)} patients)")
 
     return train_df, val_df, test_df, disease_map, condition_map
 
@@ -128,5 +127,5 @@ def compute_class_weights(df, label_col, label_map):
         n_i = counts.get(i, 0)
         weights[i] = (total / (num_classes * n_i)) if n_i > 0 else 0.0
 
-    print(f"[WEIGHTS] {label_col}: {dict(zip([inv_map[i] for i in range(num_classes)], weights.tolist()))}")
+    print(f"{label_col}: {dict(zip([inv_map[i] for i in range(num_classes)], weights.tolist()))}")
     return weights

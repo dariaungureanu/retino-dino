@@ -32,7 +32,7 @@ class OCTDLMultiTaskDataset(Dataset):
         disease_str = str(row['label_disease'])
         label_disease = self.disease_map[disease_str]
 
-        # Conditions outside the map become IGNORE_INDEX so the loss masks them.
+        # unknown conditions -> IGNORE_INDEX (masked in loss)
         condition_str = str(row['label_condition_raw'])
         if condition_str in self.condition_map:
             label_condition = self.condition_map[condition_str]
@@ -81,7 +81,7 @@ def get_data_splits(csv_path, test_size=0.2, val_size=0.1):
     val_df = df[df['patient_id'].isin(val_pat['patient_id'])]
     test_df = df[df['patient_id'].isin(test_pat['patient_id'])]
 
-    print(f"Split Complete:")
+    print("Split Complete:")
     print(f"   Train: {len(train_df)} images ({len(train_pat)} patients)")
     print(f"   Val:   {len(val_df)} images ({len(val_pat)} patients)")
     print(f"   Test:  {len(test_df)} images ({len(test_pat)} patients)")

@@ -173,18 +173,14 @@ def evaluate_test(model, loader, criterion_d, criterion_c, device,
     labels_c = cat_labels_c.cpu().numpy()
     cond_mask = labels_c != IGNORE_INDEX
 
-    print(f"\n{'='*60}")
-    print(f"  DISEASE Classification Report")
-    print(f"{'='*60}")
+    print("  DISEASE Classification Report")
     print(classification_report(
         labels_d, preds_d,
         target_names=[inv_disease[i] for i in range(len(disease_map))],
         zero_division=0,
     ))
 
-    print(f"\n{'='*60}")
-    print(f"  CONDITION Classification Report")
-    print(f"{'='*60}")
+    print("  CONDITION Classification Report")
     if cond_mask.sum() > 0:
         print(classification_report(
             labels_c[cond_mask], preds_c[cond_mask],
@@ -204,7 +200,7 @@ def main():
     parser.add_argument("--data_path", type=str, required=True,
                         help="Path to OCTDL_Cleaned directory")
     parser.add_argument("--checkpoint", type=str, default=None,
-                        help="Domain-adapted checkpoint. None = ImageNet baseline.")
+                        help="Domain-adapted checkpoint. None = ImageNet baseline")
     parser.add_argument("--save_dir", type=str, default="saved_models")
 
     # Training
@@ -234,18 +230,18 @@ def main():
 
     # Setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"[INFO] Device: {device}")
+    print(f"Device: {device}")
     if device.type == "cuda":
-        print(f"[INFO] GPU: {torch.cuda.get_device_name()}")
-        print(f"[INFO] VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
+        print(f"GPU: {torch.cuda.get_device_name()}")
+        print(f"VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
 
     os.makedirs(args.save_dir, exist_ok=True)
 
     # Validate resolution
     if args.img_size % 14 != 0:
-        print(f"[WARN] img_size={args.img_size} not divisible by 14 (patch size)!")
+        print(f"img_size={args.img_size} not divisible by 14 (patch size)!")
     grid = args.img_size // 14
-    print(f"[INFO] Resolution: {args.img_size}x{args.img_size} -> {grid}x{grid} = {grid**2} patches")
+    print(f"Resolution: {args.img_size}x{args.img_size} -> {grid}x{grid} = {grid**2} patches")
 
     # Data
     csv_path = os.path.join(args.data_path, "OCTDL_clean_metadata.csv")
@@ -271,7 +267,7 @@ def main():
     test_loader  = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False,
                               num_workers=args.num_workers, pin_memory=True)
 
-    print(f"[DATA] Batches per epoch: train={len(train_loader)}, val={len(val_loader)}, test={len(test_loader)}")
+    print(f"Batches per epoch: train={len(train_loader)}, val={len(val_loader)}, test={len(test_loader)}")
 
     # Model
     backbone = load_backbone(args.arch, args.checkpoint, device)
@@ -343,9 +339,7 @@ def main():
     patience_counter = 0
     best_epoch = 0
 
-    print(f"\n{'='*60}")
     print(f"  TRAINING START - {args.epochs} epochs")
-    print(f"{'='*60}\n")
 
     for epoch in range(1, args.epochs + 1):
         t0 = time.time()
@@ -423,10 +417,7 @@ def main():
                 break
 
     # Test evaluation on best checkpoint
-    print(f"\n{'='*60}")
     print(f"  FINAL TEST EVALUATION (best checkpoint: epoch {best_epoch})")
-    print(f"{'='*60}")
-
     best_ckpt = torch.load(
         os.path.join(args.save_dir, "best_model.pth"),
         map_location=device,
@@ -438,9 +429,7 @@ def main():
         disease_map, condition_map,
     )
 
-    print(f"\n{'='*60}")
-    print(f"  FINAL RESULTS")
-    print(f"{'='*60}")
+    print("  FINAL RESULTS")
     print(f"  Disease:   acc={test_d['acc']:.2f}%  bal_acc={test_d['bal_acc']:.2f}%  "
           f"macro_F1={test_d['macro_f1']:.4f}")
     print(f"  Condition: acc={test_c['acc']:.2f}%  bal_acc={test_c['bal_acc']:.2f}%  "

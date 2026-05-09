@@ -31,7 +31,9 @@ Usage:
 import argparse
 import os
 import sys
-
+from pytorch_grad_cam import GradCAM
+from pytorch_grad_cam.utils.image import show_cam_on_image
+from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 import numpy as np
 import torch
 import torch.nn as nn
@@ -52,14 +54,14 @@ from model import OCTDLMultiTaskModel, load_backbone
 
 def load_model_from_checkpoint(model_path, device):
     """Load fine-tuned model from checkpoint. Returns (model, ckpt_dict)."""
-    print(f"[INFO] Loading checkpoint: {model_path}")
+    print(f"Loading checkpoint: {model_path}")
     ckpt = torch.load(model_path, map_location=device)
 
     config = ckpt["config"]
     disease_map = ckpt["disease_map"]
     condition_map = ckpt["condition_map"]
 
-    print(f"[INFO] arch={config['arch']}  unfreeze={config['unfreeze_last_n']}  "
+    print(f"arch={config['arch']}  unfreeze={config['unfreeze_last_n']}  "
           f"epoch={ckpt['epoch']}  val_f1={ckpt['val_disease_f1']:.4f}")
 
     backbone = load_backbone(config["arch"], config["checkpoint"], device)
@@ -122,7 +124,7 @@ def plot_tsne(features, labels, label_map, title, save_path,
     labels = labels[valid_mask]
 
     if len(features) == 0:
-        print(f"[WARN] No valid samples for t-SNE: {title}")
+        print(f"No valid samples for t-SNE: {title}")
         return
 
     print(f"[t-SNE] Computing projection for {len(features)} samples...")
@@ -148,7 +150,7 @@ def plot_tsne(features, labels, label_map, title, save_path,
     plt.tight_layout()
     plt.savefig(save_path, dpi=200, bbox_inches="tight")
     plt.close()
-    print(f"[SAVED] {save_path}")
+    print(f"{save_path}")
 
 class TaskHeadWrapper(nn.Module):
     """Wraps the multi-task model to output only one head's logits."""
@@ -232,20 +234,10 @@ def generate_gradcam_grid(
     model, dataset, sample_indices, head_index, label_map,
     task_name, save_path, device,
 ):
-    """
-    Generate GradCAM visualization for selected samples.
-    Shows: Original | CAM for Predicted | CAM for True
-    """
-    try:
-        from pytorch_grad_cam import GradCAM
-        from pytorch_grad_cam.utils.image import show_cam_on_image
-        from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
-    except ImportError:
-        print("[ERROR] pytorch-grad-cam not installed. Run: pip install pytorch-grad-cam")
-        return
+    """GradCAM grid: original | CAM for predicted | CAM for true."""
 
     if len(sample_indices) == 0:
-        print(f"[SKIP] No samples for GradCAM: {task_name}")
+        print(f"No samples for GradCAM: {task_name}")
         return
 
     for p in model.backbone.parameters():
@@ -303,7 +295,7 @@ def generate_gradcam_grid(
     plt.tight_layout()
     fig.savefig(save_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
-    print(f"[SAVED] {save_path}")
+    print(f"{save_path}")
 
 
 def main():
@@ -356,13 +348,10 @@ def main():
         test_ds, batch_size=args.batch_size, shuffle=False,
         num_workers=args.num_workers, pin_memory=True,
     )
-    print(f"[DATA] Test set: {len(test_ds)} images")
+    print(f"Test set: {len(test_ds)} images")
 
     if not args.skip_tsne:
-        print(f"\n{'='*60}")
-        print(f"  T-SNE VISUALIZATION")
-        print(f"{'='*60}")
-
+        print("  T-SNE VISUALIZATION")
         features, labels_d, labels_c = extract_features_and_labels(
             model, test_loader, device,
         )
@@ -384,10 +373,7 @@ def main():
         )
 
     if not args.skip_gradcam:
-        print(f"\n{'='*60}")
-        print(f"  GRADCAM ERROR ANALYSIS")
-        print(f"{'='*60}")
-
+        print("  GRADCAM ERROR ANALYSIS")
         # Top disease errors
         y_true_d, y_pred_d, y_conf_d, idx_d = collect_predictions(
             model, test_loader, device, head_index=0,
@@ -438,7 +424,7 @@ def main():
                     save_path=os.path.join(args.out_dir, f"gradcam_condition_errors_{cls_name}.png"),
                 )
             else:
-                print(f"[WARN] Class '{cls_name}' not found in disease or condition maps")
+                print(f"Class '{cls_name}' not found in disease or condition maps")
 
     print(f"\n[DONE] All outputs saved to: {args.out_dir}")
 

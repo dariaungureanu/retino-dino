@@ -35,14 +35,14 @@ from model import OCTDLMultiTaskModel, load_backbone
 
 
 def load_model_from_checkpoint(model_path, device):
-    print(f"[INFO] Loading checkpoint: {model_path}")
+    print(f"Loading checkpoint: {model_path}")
     ckpt = torch.load(model_path, map_location=device)
 
     config = ckpt["config"]
     disease_map = ckpt["disease_map"]
     condition_map = ckpt["condition_map"]
 
-    print(f"[INFO] arch={config['arch']}  unfreeze={config['unfreeze_last_n']}  "
+    print(f"arch={config['arch']}  unfreeze={config['unfreeze_last_n']}  "
           f"epoch={ckpt['epoch']}  val_f1={ckpt['val_disease_f1']:.4f}")
 
     backbone = load_backbone(config["arch"], config["checkpoint"], device)
@@ -130,7 +130,7 @@ def plot_confusion_matrix(
     plt.tight_layout()
     fig.savefig(save_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
-    print(f"[SAVED] {save_path}")
+    print(f"{save_path}")
 
 
 def main():
@@ -177,7 +177,7 @@ def main():
         test_ds, batch_size=args.batch_size, shuffle=False,
         num_workers=args.num_workers, pin_memory=True,
     )
-    print(f"[DATA] Test set: {len(test_ds)} images")
+    print(f"Test set: {len(test_ds)} images")
 
     # Get predictions
     preds_d, labels_d, preds_c, labels_c = get_predictions(model, test_loader, device)
@@ -225,24 +225,20 @@ def main():
             normalize=True,
         )
     else:
-        print("[WARN] No valid condition labels in test set - skipping condition matrix")
+        print("No valid condition labels in test set - skipping condition matrix")
 
     # Classification reports
-    print(f"\n{'='*60}")
-    print(f"  DISEASE Report")
-    print(f"{'='*60}")
+    print("  DISEASE Report")
     print(classification_report(labels_d, preds_d, target_names=disease_names, zero_division=0))
 
     if cond_mask.sum() > 0:
-        print(f"\n{'='*60}")
-        print(f"  CONDITION Report")
-        print(f"{'='*60}")
+        print("  CONDITION Report")
         print(classification_report(
             valid_labels_c, valid_preds_c,
             target_names=condition_names, zero_division=0,
         ))
 
-    print(f"\n[DONE] All outputs saved to: {args.out_dir}")
+    print(f"\nAll outputs saved to: {args.out_dir}")
 
 
 if __name__ == "__main__":

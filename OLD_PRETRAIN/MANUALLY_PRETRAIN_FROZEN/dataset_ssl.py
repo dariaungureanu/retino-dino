@@ -14,7 +14,7 @@ class OCTDL_SSL_Dataset(Dataset):
         for ext in extensions:
             self.image_paths.extend(glob.glob(os.path.join(root_dir, '**', ext), recursive=True))
 
-        print(f"[SSL Dataset] Found {len(self.image_paths)} images.")
+        print(f"Found {len(self.image_paths)} images.")
 
         self.img_size = 224
 

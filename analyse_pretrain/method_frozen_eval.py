@@ -71,16 +71,10 @@ def load_and_split_data(
     test_size: float = 0.2,
     random_state: int = 42,
 ) -> Tuple[List[str], List[str], List[str], List[str]]:
-    """
-    Load CSV metadata and split into train/test sets.
-    Uses patient-wise stratified split if patient_id column exists,
-    otherwise falls back to image-level stratified split.
-
-    Returns:
-        (train_paths, train_labels, test_paths, test_labels)
-    """
+    """Load CSV metadata and split into train/test, patient-wise when a
+    patient_id column exists, image-level otherwise."""
     df = pd.read_csv(csv_path)
-    print(f"[DATA] CSV loaded: {len(df)} rows")
+    print(f"CSV loaded: {len(df)} rows")
 
     if label_col not in df.columns:
         available = [c for c in df.columns if "label" in c.lower() or "disease" in c.lower()]
@@ -105,15 +99,15 @@ def load_and_split_data(
         labels.append(str(row[label_col]))
 
     if missing > 0:
-        print(f"[DATA] WARNING: {missing} images not found, skipped")
-    print(f"[DATA] Resolved {len(paths)} images across {len(set(labels))} classes")
+        print(f"WARNING: {missing} images not found, skipped")
+    print(f"Resolved {len(paths)} images across {len(set(labels))} classes")
 
     unique, counts = np.unique(labels, return_counts=True)
     for cls, cnt in sorted(zip(unique, counts), key=lambda x: -x[1]):
-        print(f"[DATA]   {cls}: {cnt} ({cnt/len(labels):.1%})")
+        print(f"{cls}: {cnt} ({cnt/len(labels):.1%})")
 
     if "patient_id" in df.columns:
-        print(f"[DATA] Using patient-wise stratified split (no data leakage)")
+        print("Using patient-wise stratified split (no data leakage)")
         valid_df = df.iloc[:len(paths)].copy()
         valid_df["_path"] = paths
         valid_df["_label"] = labels
@@ -138,15 +132,15 @@ def load_and_split_data(
             test_paths = valid_df.loc[test_mask, "_path"].tolist()
             test_labels = valid_df.loc[test_mask, "_label"].tolist()
 
-            print(f"[DATA] Split: {len(train_paths)} train, {len(test_paths)} test "
+            print(f"Split: {len(train_paths)} train, {len(test_paths)} test "
                   f"({len(train_patients)} / {len(test_patients)} patients)")
             return train_paths, train_labels, test_paths, test_labels
 
         except ValueError as e:
-            print(f"[DATA] Patient-wise split failed ({e}), falling back to image-level")
+            print(f"Patient-wise split failed ({e}), falling back to image-level")
 
     # Fallback: image-level stratified split
-    print(f"[DATA] Using image-level stratified split")
+    print("Using image-level stratified split")
     indices = np.arange(len(paths))
     try:
         train_idx, test_idx = train_test_split(
@@ -154,8 +148,8 @@ def load_and_split_data(
             random_state=random_state, stratify=labels,
         )
     except ValueError:
-        print(f"[WARN] Stratified split failed (likely too few samples in some class), "
-              f"using random split")
+        print("Stratified split failed (likely too few samples in some class), "
+              "using random split")
         train_idx, test_idx = train_test_split(
             indices, test_size=test_size, random_state=random_state,
         )
@@ -165,7 +159,7 @@ def load_and_split_data(
     test_paths = [paths[i] for i in test_idx]
     test_labels = [labels[i] for i in test_idx]
 
-    print(f"[DATA] Split: {len(train_paths)} train, {len(test_paths)} test")
+    print(f"Split: {len(train_paths)} train, {len(test_paths)} test")
     return train_paths, train_labels, test_paths, test_labels
 
 
@@ -205,7 +199,7 @@ def extract_features(
     features = np.concatenate(all_feats, axis=0)
     labels = np.concatenate(all_labels, axis=0)
 
-    print(f"[INFO] Extracted features: shape={features.shape}, "
+    print(f"Extracted features: shape={features.shape}, "
           f"dtype={features.dtype}")
     return features, labels
 
@@ -235,10 +229,10 @@ def eval_knn(
         "k": k,
     }
 
-    print(f"\n[RESULT] kNN (k={k}):")
-    print(f"[RESULT]   Accuracy:          {metrics['accuracy']:.4f}")
-    print(f"[RESULT]   Balanced Accuracy:  {metrics['balanced_accuracy']:.4f}")
-    print(f"[RESULT]   Macro-F1:           {metrics['macro_f1']:.4f}")
+    print(f"\nkNN (k={k}):")
+    print(f"Accuracy:          {metrics['accuracy']:.4f}")
+    print(f"Balanced Accuracy:  {metrics['balanced_accuracy']:.4f}")
+    print(f"Macro-F1:           {metrics['macro_f1']:.4f}")
 
     return metrics
 
@@ -275,11 +269,11 @@ def eval_linear_probe(
         "per_class_report": report,
     }
 
-    print(f"\n[RESULT] Linear Probe:")
-    print(f"[RESULT]   Accuracy:          {metrics['accuracy']:.4f}")
-    print(f"[RESULT]   Balanced Accuracy:  {metrics['balanced_accuracy']:.4f}")
-    print(f"[RESULT]   Macro-F1:           {metrics['macro_f1']:.4f}")
-    print(f"\n[RESULT] Per-class report:")
+    print("\nLinear Probe:")
+    print(f"Accuracy:          {metrics['accuracy']:.4f}")
+    print(f"Balanced Accuracy:  {metrics['balanced_accuracy']:.4f}")
+    print(f"Macro-F1:           {metrics['macro_f1']:.4f}")
+    print("\nPer-class report:")
     print(classification_report(y_test, pred, zero_division=0))
 
     return metrics
@@ -296,7 +290,7 @@ def main():
     ap.add_argument("--arch", default=DEFAULT_ARCH,
                     help="DINOv2 hub architecture")
     ap.add_argument("--checkpoint", default=None,
-                    help="Domain-adapted checkpoint. Omit for ImageNet baseline.")
+                    help="Domain-adapted checkpoint. Omit for ImageNet baseline")
 
     # Data
     ap.add_argument("--csv", required=True, help="Path to metadata CSV")
@@ -383,7 +377,7 @@ def main():
     with open(out_json, "w", encoding="utf-8") as f:
         json.dump(result, f, indent=2)
 
-    print(f"\n[INFO] Results saved: {out_json}")
+    print(f"\nResults saved: {out_json}")
 
 
 

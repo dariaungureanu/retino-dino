@@ -13,24 +13,21 @@ import torch.nn.functional as F
 
 def load_backbone(arch, checkpoint, device):
     """Load DINOv2 backbone. Handles FSDP checkpoints, prefix matching, pos_embed interpolation."""
-    print(f"\n{'='*60}")
-    print(f"  MODEL LOADING")
-    print(f"{'='*60}")
-
+    print("  MODEL LOADING")
     model = torch.hub.load("facebookresearch/dinov2", arch)
     model_keys = set(model.state_dict().keys())
-    print(f"[MODEL] {arch}: {len(model_keys)} params")
+    print(f"{arch}: {len(model_keys)} params")
 
     if checkpoint is None:
-        print(f"[MODEL] No checkpoint -> ImageNet baseline")
+        print("No checkpoint -> ImageNet baseline")
         return model.to(device)
 
     if not os.path.isfile(checkpoint):
-        print(f"[FATAL] Not found: {checkpoint}")
+        print(f"Not found: {checkpoint}")
         sys.exit(1)
 
     ckpt = torch.load(checkpoint, map_location="cpu")
-    print(f"[MODEL] Checkpoint: {checkpoint}")
+    print(f"Checkpoint: {checkpoint}")
 
     if "model" in ckpt:
         st = ckpt["model"]
@@ -70,7 +67,7 @@ def load_backbone(arch, checkpoint, device):
                     matched_prefix = prefix
                     break
 
-    print(f"[MODEL] Prefix: '{matched_prefix}', {len(clean)} keys")
+    print(f"Prefix: '{matched_prefix}', {len(clean)} keys")
 
     if "pos_embed" in clean and "pos_embed" in model_keys:
         ckpt_pos = clean["pos_embed"]
@@ -88,17 +85,16 @@ def load_backbone(arch, checkpoint, device):
                                       mode="bicubic", align_corners=False)
             patch_pos = patch_pos.permute(0, 2, 3, 1).reshape(1, -1, d)
             clean["pos_embed"] = torch.cat([cls_pos, patch_pos], dim=1)
-            print(f"[MODEL] pos_embed interpolated")
+            print("pos_embed interpolated")
 
     result = model.load_state_dict(clean, strict=False)
     loaded = len(model_keys) - len(result.missing_keys)
 
     if loaded == 0:
-        print(f"[FATAL] Zero keys loaded!")
+        print("Zero keys loaded!")
         sys.exit(1)
 
-    print(f"[MODEL] Loaded {loaded}/{len(model_keys)} keys")
-    print(f"{'='*60}\n")
+    print(f"Loaded {loaded}/{len(model_keys)} keys")
     return model.to(device)
 
 
@@ -135,7 +131,7 @@ class MMRDRModel(nn.Module):
 
         total = sum(p.numel() for p in self.parameters())
         trainable = sum(p.numel() for p in self.parameters() if p.requires_grad)
-        print(f"[MODEL] {total:,} total | {trainable:,} trainable ({100*trainable/total:.1f}%)")
+        print(f"{total:,} total | {trainable:,} trainable ({100*trainable/total:.1f}%)")
 
     def forward(self, x):
         features = self.backbone(x)

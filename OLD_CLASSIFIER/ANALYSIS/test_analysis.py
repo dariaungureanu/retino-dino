@@ -9,6 +9,8 @@ import seaborn as sns
 from tqdm import tqdm
 from sklearn.metrics import classification_report, confusion_matrix
 import sys
+from OLD_CLASSIFIER.dataset import get_data_splits, OCTDLMultiTaskDataset
+from OLD_CLASSIFIER.model import OCTDLMultiTaskModel
 
 current_script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_script_dir)
@@ -26,14 +28,6 @@ if not os.path.exists(classifier_dir):
 
 if classifier_dir not in sys.path:
     sys.path.insert(0, classifier_dir)
-print(f" Added to path: {classifier_dir}")
-
-try:
-    from dataset import get_data_splits, OCTDLMultiTaskDataset
-    from model import OCTDLMultiTaskModel
-except ImportError as e:
-    print(f"Error at import: {e}")
-    sys.exit(1)
 
 
 def plot_confusion_matrix(cm, class_names, title, save_path):

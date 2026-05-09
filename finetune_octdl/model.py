@@ -19,42 +19,38 @@ def load_backbone(
 ) -> nn.Module:
     """Load DINOv2 backbone from torch.hub; optionally overwrite weights from
     a continual-pretraining checkpoint."""
-    print(f"\n{'='*60}")
-    print(f"  MODEL LOADING DIAGNOSTICS")
-    print(f"{'='*60}")
-
-    print(f"[MODEL] Architecture: {arch}")
+    print("  MODEL LOADING DIAGNOSTICS")
+    print(f"Architecture: {arch}")
     model = torch.hub.load("facebookresearch/dinov2", arch)
     model_keys = set(model.state_dict().keys())
-    print(f"[MODEL] Hub model: {len(model_keys)} parameter tensors")
+    print(f"Hub model: {len(model_keys)} parameter tensors")
 
     if checkpoint is None:
-        print(f"[MODEL] No checkpoint -> ImageNet baseline")
-        print(f"{'='*60}\n")
+        print("No checkpoint -> ImageNet baseline")
         return model.to(device)
 
     if not os.path.isfile(checkpoint):
-        print(f"[FATAL] Checkpoint not found: {checkpoint}")
+        print(f"Checkpoint not found: {checkpoint}")
         sys.exit(1)
 
-    print(f"[MODEL] Checkpoint: {checkpoint}")
+    print(f"Checkpoint: {checkpoint}")
     ckpt = torch.load(checkpoint, map_location="cpu")
-    print(f"[MODEL] Top-level keys: {list(ckpt.keys())}")
+    print(f"Top-level keys: {list(ckpt.keys())}")
 
     if "model" in ckpt:
         st = ckpt["model"]
-        print(f"[MODEL] Using 'model' sub-dict ({len(st)} keys)")
+        print(f"Using 'model' sub-dict ({len(st)} keys)")
     elif "teacher" in ckpt:
         st = ckpt["teacher"]
-        print(f"[MODEL] Using 'teacher' sub-dict ({len(st)} keys)")
+        print(f"Using 'teacher' sub-dict ({len(st)} keys)")
     elif "state_dict" in ckpt:
         st = ckpt["state_dict"]
-        print(f"[MODEL] Using 'state_dict' sub-dict ({len(st)} keys)")
+        print(f"Using 'state_dict' sub-dict ({len(st)} keys)")
     else:
         st = ckpt
-        print(f"[MODEL] No recognized sub-dict, using top-level")
+        print("No recognized sub-dict, using top-level")
 
-    print(f"[MODEL] Raw keys (first 5): {list(st.keys())[:5]}")
+    print(f"Raw keys (first 5): {list(st.keys())[:5]}")
 
     PREFIX_PATTERNS = [
         "teacher.backbone.",
@@ -86,7 +82,7 @@ def load_backbone(
                 break
 
     if not clean:
-        print(f"[MODEL] No prefix matched cleanly. Forcing teacher.backbone.*")
+        print("No prefix matched cleanly. Forcing teacher.backbone.*")
         for k, v in st.items():
             for prefix in ["teacher.backbone.", "student.backbone.", "backbone.", "module."]:
                 if k.startswith(prefix):
@@ -94,17 +90,16 @@ def load_backbone(
                     matched_prefix = prefix
                     break
 
-    print(f"[MODEL] Matched prefix: '{matched_prefix}'")
-    print(f"[MODEL] Cleaned keys: {len(clean)} (first 3: {list(clean.keys())[:3]})")
+    print(f"Matched prefix: '{matched_prefix}'")
+    print(f"Cleaned keys: {len(clean)} (first 3: {list(clean.keys())[:3]})")
 
-    # Interpolate pos_embed when the SSL pretraining resolution differs from
-    # the fine-tuning resolution; without this load_state_dict raises on shape.
+    # interpolate pos_embed across SSL/fine-tune resolution mismatch
     if "pos_embed" in clean and "pos_embed" in model_keys:
         ckpt_pos  = clean["pos_embed"]
         model_pos = model.state_dict()["pos_embed"]
 
         if ckpt_pos.shape != model_pos.shape:
-            print(f"[MODEL] pos_embed mismatch: ckpt {list(ckpt_pos.shape)} "
+            print(f"pos_embed mismatch: ckpt {list(ckpt_pos.shape)} "
                   f"vs model {list(model_pos.shape)}")
 
             cls_pos   = ckpt_pos[:, :1, :]           # [1, 1, D]
@@ -116,7 +111,7 @@ def load_backbone(
             g_model = int(n_model ** 0.5)
             d       = patch_pos.shape[-1]
 
-            print(f"[MODEL] Interpolating: {g_ckpt}x{g_ckpt} -> {g_model}x{g_model}")
+            print(f"Interpolating: {g_ckpt}x{g_ckpt} -> {g_model}x{g_model}")
 
             patch_pos = patch_pos.reshape(1, g_ckpt, g_ckpt, d).permute(0, 3, 1, 2)
             patch_pos = F.interpolate(
@@ -125,26 +120,25 @@ def load_backbone(
             )
             patch_pos = patch_pos.permute(0, 2, 3, 1).reshape(1, -1, d)
             clean["pos_embed"] = torch.cat([cls_pos, patch_pos], dim=1)
-            print(f"[MODEL] pos_embed interpolated: {list(clean['pos_embed'].shape)}")
+            print(f"pos_embed interpolated: {list(clean['pos_embed'].shape)}")
 
     result = model.load_state_dict(clean, strict=False)
     loaded = len(model_keys) - len(result.missing_keys)
 
-    print(f"\n[MODEL] Loaded: {loaded}/{len(model_keys)} keys")
+    print(f"\nLoaded: {loaded}/{len(model_keys)} keys")
     if result.missing_keys:
-        print(f"[MODEL] Missing (first 5): {result.missing_keys[:5]}")
+        print(f"Missing (first 5): {result.missing_keys[:5]}")
     if result.unexpected_keys:
-        print(f"[MODEL] Unexpected (first 5): {result.unexpected_keys[:5]}")
+        print(f"Unexpected (first 5): {result.unexpected_keys[:5]}")
 
     if loaded == 0:
-        print(f"\n[FATAL] Zero keys loaded! Weights are still ImageNet!")
+        print("\nZero keys loaded! Weights are still ImageNet!")
         sys.exit(1)
     elif loaded < len(model_keys) * 0.9:
-        print(f"\n[WARN] Partial load: {loaded}/{len(model_keys)}")
+        print(f"\nPartial load: {loaded}/{len(model_keys)}")
     else:
-        print(f"\n[MODEL] Domain-adapted weights loaded successfully")
+        print("\nDomain-adapted weights loaded successfully")
 
-    print(f"{'='*60}\n")
     return model.to(device)
 
 
@@ -199,7 +193,7 @@ class OCTDLMultiTaskModel(nn.Module):
             param.requires_grad = False
 
         if unfreeze_last_n == 0:
-            print(f"[MODEL] Backbone fully frozen (linear probing)")
+            print("Backbone fully frozen (linear probing)")
             return
 
         unfreeze_start = self.NUM_BLOCKS - unfreeze_last_n
@@ -211,8 +205,7 @@ class OCTDLMultiTaskModel(nn.Module):
                 if f"blocks.{block_idx}." in name:
                     should_unfreeze = True
                     break
-            # The final norm runs on every forward pass; train it whenever any
-            # block above it is being trained.
+            # final norm: always train when any block is unfrozen
             if name.startswith("norm."):
                 should_unfreeze = True
 
@@ -220,14 +213,14 @@ class OCTDLMultiTaskModel(nn.Module):
                 param.requires_grad = True
                 unfrozen_names.append(name)
 
-        print(f"[MODEL] Unfrozen blocks: {unfreeze_start}-{self.NUM_BLOCKS - 1} "
+        print(f"Unfrozen blocks: {unfreeze_start}-{self.NUM_BLOCKS - 1} "
               f"+ norm ({len(unfrozen_names)} params)")
 
     def _print_param_summary(self):
         total = sum(p.numel() for p in self.parameters())
         trainable = sum(p.numel() for p in self.parameters() if p.requires_grad)
         frozen = total - trainable
-        print(f"[MODEL] Parameters: {total:,} total | "
+        print(f"Parameters: {total:,} total | "
               f"{trainable:,} trainable ({100*trainable/total:.1f}%) | "
               f"{frozen:,} frozen")
 
@@ -281,7 +274,7 @@ class OCTDLMultiTaskModel(nn.Module):
 
         for g in groups:
             n = sum(p.numel() for p in g["params"])
-            print(f"[OPTIM] lr={g['lr']:.1e}  wd={g['weight_decay']:.1e}  "
+            print(f"lr={g['lr']:.1e}  wd={g['weight_decay']:.1e}  "
                   f"params={n:,}")
 
         return groups

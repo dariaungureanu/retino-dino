@@ -177,7 +177,7 @@ def main():
     )
     if args.max_images > 0:
         samples = samples[:args.max_images]
-        print(f"[DATA] Using first {len(samples)} images")
+        print(f"Using first {len(samples)} images")
 
     ds = OCTDataset(samples, img_size=args.img_size)
     dl = DataLoader(ds, batch_size=1, shuffle=False, num_workers=2)
@@ -188,7 +188,7 @@ def main():
     # Shape check
     with torch.no_grad():
         test_tokens = get_patch_tokens(model, ds[0][0].unsqueeze(0).to(device))
-        print(f"[INFO] Patch tokens shape: {test_tokens.shape}  "
+        print(f"Patch tokens shape: {test_tokens.shape}  "
               f"(expected [1, {grid_side ** 2}, *])")
 
     # Process
@@ -227,8 +227,8 @@ def main():
 
     # Summary
     avg_var = np.mean(all_variance, axis=0)
-    print(f"\n[RESULT] Processed {len(records)} images")
-    print(f"[RESULT] Avg explained variance (3 PCA components): "
+    print(f"\nProcessed {len(records)} images")
+    print("Avg explained variance (3 PCA components): "
           f"{avg_var[0]:.1%}, {avg_var[1]:.1%}, {avg_var[2]:.1%}  "
           f"(total: {avg_var.sum():.1%})")
 
@@ -249,7 +249,7 @@ def main():
     os.makedirs(os.path.dirname(out_json), exist_ok=True)
     with open(out_json, "w", encoding="utf-8") as f:
         json.dump(result, f, indent=2)
-    print(f"[INFO] JSON log saved: {out_json}")
+    print(f"JSON log saved: {out_json}")
 
 
 if __name__ == "__main__":

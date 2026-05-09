@@ -79,7 +79,7 @@ def load_all_samples(
     import pandas as pd
 
     df = pd.read_csv(csv_path)
-    print(f"[DATA] CSV loaded: {len(df)} rows")
+    print(f"CSV loaded: {len(df)} rows")
 
     if label_col not in df.columns:
         available = [c for c in df.columns if "label" in c.lower() or "disease" in c.lower()]
@@ -101,13 +101,13 @@ def load_all_samples(
         labels.append(str(row[label_col]))
 
     if missing > 0:
-        print(f"[DATA] WARNING: {missing} images not found, skipped")
+        print(f"WARNING: {missing} images not found, skipped")
 
     # Class distribution
     unique, counts = np.unique(labels, return_counts=True)
-    print(f"[DATA] {len(paths)} images, {len(unique)} classes:")
+    print(f"{len(paths)} images, {len(unique)} classes:")
     for cls, cnt in sorted(zip(unique, counts), key=lambda x: -x[1]):
-        print(f"[DATA]   {cls}: {cnt} ({cnt / len(labels):.1%})")
+        print(f"{cls}: {cnt} ({cnt / len(labels):.1%})")
 
     return paths, labels
 
@@ -141,7 +141,7 @@ def extract_cls_tokens(
 
     features = np.concatenate(all_feats, axis=0)
     labels = np.concatenate(all_labels, axis=0)
-    print(f"[INFO] Extracted: {features.shape[0]} vectors, dim={features.shape[1]}")
+    print(f"Extracted: {features.shape[0]} vectors, dim={features.shape[1]}")
     return features, labels
 
 
@@ -154,16 +154,11 @@ def run_umap(
     random_state: int = 42,
 ) -> np.ndarray:
     """Project features to 2D via UMAP."""
-    try:
-        import umap
-    except ImportError:
-        raise ImportError(
-            "umap-learn not installed. Run: pip install umap-learn"
-        )
+    import umap
 
-    print(f"[UMAP] Running UMAP (n_neighbors={n_neighbors}, min_dist={min_dist})...")
+    print(f"Running UMAP (n_neighbors={n_neighbors}, min_dist={min_dist})...")
 
-    # StandardScaler before UMAP keeps the projection stable across runs.
+    # standardize before UMAP for stable projection
     scaler = StandardScaler()
     features_scaled = scaler.fit_transform(features)
 
@@ -176,7 +171,7 @@ def run_umap(
         verbose=True,
     )
     embedding = reducer.fit_transform(features_scaled)
-    print(f"[UMAP] Done. Output shape: {embedding.shape}")
+    print(f"Done. Output shape: {embedding.shape}")
     return embedding
 
 
@@ -253,7 +248,7 @@ def save_umap_plot(
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     fig.savefig(out_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
-    print(f"[INFO] Saved plot: {out_path}")
+    print(f"Saved plot: {out_path}")
 
 
 # Main
@@ -266,7 +261,7 @@ def main():
     # Model
     ap.add_argument("--arch", default=DEFAULT_ARCH)
     ap.add_argument("--checkpoint", default=None,
-                    help="Domain-adapted checkpoint. Omit for ImageNet baseline.")
+                    help="Domain-adapted checkpoint. Omit for ImageNet baseline")
 
     # Data
     ap.add_argument("--csv", required=True)
@@ -361,7 +356,7 @@ def main():
     os.makedirs(os.path.dirname(out_json), exist_ok=True)
     with open(out_json, "w", encoding="utf-8") as f:
         json.dump(result, f, indent=2)
-    print(f"[INFO] JSON log saved: {out_json}")
+    print(f"JSON log saved: {out_json}")
 
     # Save raw embeddings (for replotting without re-extracting)
     npz_path = os.path.join(args.out_dir, "umap_data.npz")
@@ -371,7 +366,7 @@ def main():
         features=features,
         labels=label_array,
     )
-    print(f"[INFO] Raw data saved: {npz_path}")
+    print(f"Raw data saved: {npz_path}")
     print(f"\n[TIP] To replot without re-extracting features, load {npz_path} directly.")
 
 

@@ -116,10 +116,7 @@ def main():
     )
 
     # Image-level metrics (for comparison)
-    print(f"\n{'='*60}")
-    print(f"  IMAGE-LEVEL METRICS (for reference)")
-    print(f"{'='*60}")
-
+    print("  IMAGE-LEVEL METRICS (for reference)")
     img_d_f1 = f1_score(test_df_reset["true_disease"], all_preds_d,
                          average="macro", zero_division=0)
     img_d_acc = accuracy_score(test_df_reset["true_disease"], all_preds_d)
@@ -138,10 +135,7 @@ def main():
         )
         print(f"  Condition: Acc={img_c_acc*100:.1f}%  Macro-F1={img_c_f1:.4f}")
 
-    print(f"\n{'='*60}")
-    print(f"  PATIENT-LEVEL METRICS (majority vote)")
-    print(f"{'='*60}")
-
+    print("  PATIENT-LEVEL METRICS (majority vote)")
     patient_results = []
     for patient_id, group in test_df_reset.groupby("patient_id"):
         true_disease = group["true_disease"].mode().iloc[0]
@@ -181,7 +175,7 @@ def main():
 
     # Disease, patient-level
     print(f"\n  Patients in test set: {len(pat_df)}")
-    print(f"\n  --- Disease (Majority Vote) ---")
+    print("\n  --- Disease (Majority Vote) ---")
 
     disease_names = [inv_disease[i] for i in range(len(disease_map))]
     pat_true_d = pat_df["true_disease"].values
@@ -193,7 +187,7 @@ def main():
     pat_d_f1_vote = f1_score(pat_true_d, pat_pred_d_vote, average="macro", zero_division=0)
 
     print(f"  Acc={pat_d_acc_vote:.1f}%  Bal.Acc={pat_d_bal_vote:.1f}%  Macro-F1={pat_d_f1_vote:.4f}")
-    print(f"\n  Per-class report (majority vote):")
+    print("\n  Per-class report (majority vote):")
     print(classification_report(
         pat_true_d, pat_pred_d_vote,
         target_names=disease_names, zero_division=0,
@@ -201,27 +195,27 @@ def main():
 
     pat_d_acc_avg = accuracy_score(pat_true_d, pat_pred_d_avg) * 100
     pat_d_f1_avg = f1_score(pat_true_d, pat_pred_d_avg, average="macro", zero_division=0)
-    print(f"  --- Disease (Average Probabilities) ---")
+    print("  --- Disease (Average Probabilities) ---")
     print(f"  Acc={pat_d_acc_avg:.1f}%  Macro-F1={pat_d_f1_avg:.4f}")
 
     # Condition, patient-level
     valid_pat = pat_df[pat_df["true_condition"] != IGNORE_INDEX]
     if len(valid_pat) > 0:
-        print(f"\n  --- Condition (Majority Vote) ---")
+        print("\n  --- Condition (Majority Vote) ---")
         condition_names = [inv_condition[i] for i in range(len(condition_map))]
         pat_c_acc = accuracy_score(valid_pat["true_condition"], valid_pat["pred_condition"]) * 100
         pat_c_f1 = f1_score(valid_pat["true_condition"], valid_pat["pred_condition"],
                             average="macro", zero_division=0)
         print(f"  Acc={pat_c_acc:.1f}%  Macro-F1={pat_c_f1:.4f}")
-        print(f"\n  Per-class report:")
+        print("\n  Per-class report:")
         print(classification_report(
             valid_pat["true_condition"], valid_pat["pred_condition"],
             target_names=condition_names, zero_division=0,
         ))
 
     # Per-patient scan accuracy
-    print(f"\n  --- Per-Patient Scan Accuracy ---")
-    print(f"  (What fraction of each patient's scans were correctly classified?)")
+    print("\n  --- Per-Patient Scan Accuracy ---")
+    print("  (What fraction of each patient's scans were correctly classified?)")
     for _, row in pat_df.sort_values("scan_accuracy").iterrows():
         status = "ok" if row["pred_disease_vote"] == row["true_disease"] else "no"
         print(f"  {status} Patient {row['patient_id']:>6}: "
@@ -240,12 +234,10 @@ def main():
     cm_path = os.path.join(args.out_dir, "patient_confusion_disease.png")
     fig.savefig(cm_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
-    print(f"\n[SAVED] {cm_path}")
+    print(f"\n{cm_path}")
 
     # Summary comparison
-    print(f"\n{'='*60}")
-    print(f"  IMAGE-LEVEL vs PATIENT-LEVEL COMPARISON")
-    print(f"{'='*60}")
+    print("  IMAGE-LEVEL vs PATIENT-LEVEL COMPARISON")
     print(f"  {'':>20} {'Image-Level':>15} {'Patient-Level':>15}")
     print(f"  {'Disease Acc':>20} {img_d_acc*100:>14.1f}% {pat_d_acc_vote:>14.1f}%")
     print(f"  {'Disease Macro-F1':>20} {img_d_f1:>15.4f} {pat_d_f1_vote:>15.4f}")
@@ -270,7 +262,7 @@ def main():
     json_path = os.path.join(args.out_dir, "patient_level_results.json")
     with open(json_path, "w") as f:
         json.dump(results, f, indent=2)
-    print(f"\n[SAVED] {json_path}")
+    print(f"\n{json_path}")
     print("\nDone.")
 
 

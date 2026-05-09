@@ -97,8 +97,8 @@ def main():
 
     # Load bounding boxes
     bbox_df = pd.read_csv(args.bbox_csv)
-    print(f"[DATA] Loaded {len(bbox_df)} bounding boxes from {args.bbox_csv}")
-    print(f"[DATA] Unique images: {bbox_df['image'].nunique()}")
+    print(f"Loaded {len(bbox_df)} bounding boxes from {args.bbox_csv}")
+    print(f"Unique images: {bbox_df['image'].nunique()}")
 
     # Build multi-label vectors per image
     rows = []
@@ -130,14 +130,14 @@ def main():
         })
 
     if missing > 0:
-        print(f"[WARN] {missing} images not found!")
+        print(f"{missing} images not found!")
 
     df = pd.DataFrame(rows)
-    print(f"\n[DATA] Total images: {len(df)}")
-    print(f"[DATA] Unique patients: {df['patient_id'].nunique()}")
+    print(f"\nTotal images: {len(df)}")
+    print(f"Unique patients: {df['patient_id'].nunique()}")
 
     # Biomarker distribution
-    print(f"\n[DATA] Biomarker distribution:")
+    print("\nBiomarker distribution:")
     drop_biomarkers = []
     for bm in BIOMARKERS:
         n_pos = int(df[bm].sum())
@@ -149,24 +149,24 @@ def main():
         print(f"  {SHORT_NAMES[bm]:>5} ({bm}): {n_pos} images ({pct:.1f}%){status}")
 
     if drop_biomarkers:
-        print(f"\n[INFO] Biomarkers with <{args.min_samples} images: {drop_biomarkers}")
-        print(f"[INFO] These will be kept in CSV but may hurt training.")
+        print(f"\nBiomarkers with <{args.min_samples} images: {drop_biomarkers}")
+        print("These will be kept in CSV but may hurt training.")
 
     # Patient distribution
-    print(f"\n[DATA] Images per patient (top 10):")
+    print("\nImages per patient (top 10):")
     pat_counts = df.groupby("patient_id").size().sort_values(ascending=False)
     for pat, n in pat_counts.head(10).items():
         print(f"  {pat}: {n} images")
 
     # Save
     df.to_csv(args.out_csv, index=False)
-    print(f"\n[SAVED] {args.out_csv}")
-    print(f"[INFO] Columns: {list(df.columns)}")
+    print(f"\n{args.out_csv}")
+    print(f"Columns: {list(df.columns)}")
 
     # Also save the full bounding box data for GradCAM validation
     bbox_out = os.path.join(os.path.dirname(args.out_csv), "oct5k_bboxes.csv")
     bbox_df.to_csv(bbox_out, index=False)
-    print(f"[SAVED] {bbox_out} (for GradCAM validation)")
+    print(f"{bbox_out} (for GradCAM validation)")
 
 
 if __name__ == "__main__":

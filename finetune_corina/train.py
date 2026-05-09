@@ -176,9 +176,7 @@ def evaluate_test(model, loader, criterion, device, out_dir):
     preds = (probs >= THRESHOLD).astype(int)
     labels_np = cat_labels.cpu().numpy()
 
-    print(f"\n{'='*60}")
-    print(f"  BIOMARKER DETECTION REPORT")
-    print(f"{'='*60}")
+    print("  BIOMARKER DETECTION REPORT")
     for i, bm in enumerate(BIOMARKERS):
         print(f"\n  {bm}:")
         print(f"    F1={metrics[f'f1_{bm}']:.4f}  "
@@ -206,7 +204,7 @@ def evaluate_test(model, loader, criterion, device, out_dir):
     cm_path = os.path.join(out_dir, "confusion_matrices.png")
     fig.savefig(cm_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
-    print(f"[SAVED] {cm_path}")
+    print(f"{cm_path}")
 
     return metrics
 
@@ -238,7 +236,7 @@ def main():
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"[INFO] Device: {device}")
+    print(f"Device: {device}")
     os.makedirs(args.save_dir, exist_ok=True)
 
     train_df, val_df, test_df = load_corina_splits(args.csv, args.data_path)
@@ -256,7 +254,7 @@ def main():
     test_loader  = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False,
                               num_workers=args.num_workers, pin_memory=True)
 
-    print(f"[DATA] Batches: train={len(train_loader)}, val={len(val_loader)}, test={len(test_loader)}")
+    print(f"Batches: train={len(train_loader)}, val={len(val_loader)}, test={len(test_loader)}")
 
     backbone = load_backbone(args.arch, args.checkpoint, device)
     model = CorinaModel(
@@ -289,9 +287,7 @@ def main():
     patience_counter = 0
     best_epoch = 0
 
-    print(f"\n{'='*60}")
     print(f"  TRAINING - {args.epochs} epochs, {NUM_LABELS} biomarkers")
-    print(f"{'='*60}\n")
 
     for epoch in range(1, args.epochs + 1):
         t0 = time.time()
@@ -350,18 +346,13 @@ def main():
                 print(f"\n[EARLY STOP] Best: epoch {best_epoch}, F1={best_val_f1:.4f}")
                 break
 
-    print(f"\n{'='*60}")
     print(f"  FINAL TEST (best checkpoint: epoch {best_epoch})")
-    print(f"{'='*60}")
-
     best_ckpt = torch.load(os.path.join(args.save_dir, "best_model.pth"), map_location=device)
     model.load_state_dict(best_ckpt["model_state_dict"])
 
     test_met = evaluate_test(model, test_loader, criterion, device, args.save_dir)
 
-    print(f"\n{'='*60}")
-    print(f"  FINAL RESULTS")
-    print(f"{'='*60}")
+    print("  FINAL RESULTS")
     for bm in BIOMARKERS:
         print(f"  {bm:>8}: F1={test_met[f'f1_{bm}']:.4f}  "
               f"AUC={test_met[f'auc_{bm}']:.4f}  "
@@ -379,7 +370,7 @@ def main():
     json_path = os.path.join(args.save_dir, "results.json")
     with open(json_path, "w") as f:
         json.dump(results, f, indent=2)
-    print(f"\n[SAVED] {json_path}")
+    print(f"\n{json_path}")
 
     test_log = {"test/f1_macro": test_met["f1_macro"],
                 "test/auc_macro": test_met["auc_macro"],

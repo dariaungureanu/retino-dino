@@ -14,20 +14,17 @@ import torch.nn.functional as F
 
 def load_backbone(arch, checkpoint, device):
     """Same backbone loading as OCTDL/MMRDR pipelines."""
-    print(f"\n{'='*60}")
-    print(f"  MODEL LOADING")
-    print(f"{'='*60}")
-
+    print("  MODEL LOADING")
     model = torch.hub.load("facebookresearch/dinov2", arch)
     model_keys = set(model.state_dict().keys())
-    print(f"[MODEL] {arch}: {len(model_keys)} params")
+    print(f"{arch}: {len(model_keys)} params")
 
     if checkpoint is None:
-        print(f"[MODEL] No checkpoint - ImageNet baseline")
+        print("No checkpoint - ImageNet baseline")
         return model.to(device)
 
     if not os.path.isfile(checkpoint):
-        print(f"[FATAL] Not found: {checkpoint}")
+        print(f"Not found: {checkpoint}")
         sys.exit(1)
 
     ckpt = torch.load(checkpoint, map_location="cpu")
@@ -86,11 +83,10 @@ def load_backbone(arch, checkpoint, device):
     loaded = len(model_keys) - len(result.missing_keys)
 
     if loaded == 0:
-        print(f"[FATAL] Zero keys loaded!")
+        print("Zero keys loaded!")
         sys.exit(1)
 
-    print(f"[MODEL] Loaded {loaded}/{len(model_keys)} keys")
-    print(f"{'='*60}\n")
+    print(f"Loaded {loaded}/{len(model_keys)} keys")
     return model.to(device)
 
 
@@ -131,7 +127,7 @@ class OCT5kModel(nn.Module):
 
         total = sum(p.numel() for p in self.parameters())
         trainable = sum(p.numel() for p in self.parameters() if p.requires_grad)
-        print(f"[MODEL] {total:,} total | {trainable:,} trainable ({100*trainable/total:.1f}%)")
+        print(f"{total:,} total | {trainable:,} trainable ({100*trainable/total:.1f}%)")
 
     def forward(self, x):
         features = self.backbone(x)

@@ -14,7 +14,7 @@ class DINO_Dataset(Dataset):
         extensions = ['*.jpg', '*.jpeg', '*.png', '*.bmp', '*.tif']
         for ext in extensions:
             self.image_paths.extend(glob.glob(os.path.join(root_dir, '**', ext), recursive=True))
-        print(f"[SSL DINO Dataset] Found {len(self.image_paths)} images.")
+        print(f"Found {len(self.image_paths)} images.")
 
         self.global_transform1 = transforms.Compose([
             transforms.RandomResizedCrop(global_size, scale=(0.4, 1.0)),

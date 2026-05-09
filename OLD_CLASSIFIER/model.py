@@ -4,7 +4,7 @@ import os
 
 
 def load_custom_backbone(checkpoint_path):
-    print(f"Loading backbone architecture from Torch Hub...")
+    print("Loading backbone architecture from Torch Hub...")
 
     backbone = torch.hub.load('facebookresearch/dinov2', 'dinov2_vitl14')
 
