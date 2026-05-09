@@ -41,7 +41,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-
+import umap
 from analyse_shared import (
     load_model, get_device, IMAGENET_MEAN, IMAGENET_STD, DEFAULT_ARCH,
 )
@@ -154,7 +154,6 @@ def run_umap(
     random_state: int = 42,
 ) -> np.ndarray:
     """Project features to 2D via UMAP."""
-    import umap
 
     print(f"Running UMAP (n_neighbors={n_neighbors}, min_dist={min_dist})...")
 
