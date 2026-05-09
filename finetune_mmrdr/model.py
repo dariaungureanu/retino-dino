@@ -19,15 +19,15 @@ def load_backbone(arch, checkpoint, device):
     print(f"{arch}: {len(model_keys)} params")
 
     if checkpoint is None:
-        print("No checkpoint -> ImageNet baseline")
+        print("no checkpoint -> ImageNet baseline")
         return model.to(device)
 
     if not os.path.isfile(checkpoint):
-        print(f"Not found: {checkpoint}")
+        print(f"not found: {checkpoint}")
         sys.exit(1)
 
     ckpt = torch.load(checkpoint, map_location="cpu")
-    print(f"Checkpoint: {checkpoint}")
+    print(f"checkpoint: {checkpoint}")
 
     if "model" in ckpt:
         st = ckpt["model"]
@@ -67,7 +67,7 @@ def load_backbone(arch, checkpoint, device):
                     matched_prefix = prefix
                     break
 
-    print(f"Prefix: '{matched_prefix}', {len(clean)} keys")
+    print(f"prefix: '{matched_prefix}', {len(clean)} keys")
 
     if "pos_embed" in clean and "pos_embed" in model_keys:
         ckpt_pos = clean["pos_embed"]
@@ -91,10 +91,10 @@ def load_backbone(arch, checkpoint, device):
     loaded = len(model_keys) - len(result.missing_keys)
 
     if loaded == 0:
-        print("Zero keys loaded!")
+        print("zero keys loaded!")
         sys.exit(1)
 
-    print(f"Loaded {loaded}/{len(model_keys)} keys")
+    print(f"loaded {loaded}/{len(model_keys)} keys")
     return model.to(device)
 
 

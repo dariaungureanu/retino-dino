@@ -97,8 +97,8 @@ def main():
 
     # Load bounding boxes
     bbox_df = pd.read_csv(args.bbox_csv)
-    print(f"Loaded {len(bbox_df)} bounding boxes from {args.bbox_csv}")
-    print(f"Unique images: {bbox_df['image'].nunique()}")
+    print(f"loaded {len(bbox_df)} bounding boxes from {args.bbox_csv}")
+    print(f"unique images: {bbox_df['image'].nunique()}")
 
     # Build multi-label vectors per image
     rows = []
@@ -115,10 +115,9 @@ def main():
         present_classes = set(group["class"].unique())
         labels = {bm: (1 if bm in present_classes else 0) for bm in BIOMARKERS}
 
-        # Patient ID
         patient_id = extract_patient_id(img_rel)
 
-        # Store bounding boxes as JSON string for GradCAM validation later
+        # bboxes saved separately for later gradcam IoU
         bboxes = group[["xmin", "ymin", "xmax", "ymax", "class"]].to_dict("records")
 
         rows.append({
@@ -133,11 +132,11 @@ def main():
         print(f"{missing} images not found!")
 
     df = pd.DataFrame(rows)
-    print(f"\nTotal images: {len(df)}")
-    print(f"Unique patients: {df['patient_id'].nunique()}")
+    print(f"\ntotal images: {len(df)}")
+    print(f"unique patients: {df['patient_id'].nunique()}")
 
     # Biomarker distribution
-    print("\nBiomarker distribution:")
+    print("\nbiomarker distribution:")
     drop_biomarkers = []
     for bm in BIOMARKERS:
         n_pos = int(df[bm].sum())
@@ -149,11 +148,11 @@ def main():
         print(f"{SHORT_NAMES[bm]:>5} ({bm}): {n_pos} images ({pct:.1f}%){status}")
 
     if drop_biomarkers:
-        print(f"\nBiomarkers with <{args.min_samples} images: {drop_biomarkers}")
-        print("These will be kept in CSV but may hurt training.")
+        print(f"\nbiomarkers with <{args.min_samples} images: {drop_biomarkers}")
+        print("these will be kept in CSV but may hurt training.")
 
     # Patient distribution
-    print("\nImages per patient (top 10):")
+    print("\nimages per patient (top 10):")
     pat_counts = df.groupby("patient_id").size().sort_values(ascending=False)
     for pat, n in pat_counts.head(10).items():
         print(f"{pat}: {n} images")
@@ -161,12 +160,11 @@ def main():
     # Save
     df.to_csv(args.out_csv, index=False)
     print(f"\n{args.out_csv}")
-    print(f"Columns: {list(df.columns)}")
+    print(f"columns: {list(df.columns)}")
 
-    # Also save the full bounding box data for GradCAM validation
     bbox_out = os.path.join(os.path.dirname(args.out_csv), "oct5k_bboxes.csv")
     bbox_df.to_csv(bbox_out, index=False)
-    print(f"{bbox_out} (for GradCAM validation)")
+    print(f"{bbox_out} (for gradcam IoU)")
 
 
 if __name__ == "__main__":

@@ -74,7 +74,7 @@ class OCTDLMultiTaskDataset(Dataset):
 def get_data_splits(csv_path, test_size=0.2, val_size=0.1, random_state=42):
     """Patient-stratified split into train/val/test DataFrames."""
     df = pd.read_csv(csv_path)
-    print(f"Loaded {len(df)} rows from {csv_path}")
+    print(f"loaded {len(df)} rows from {csv_path}")
 
     unique_diseases = sorted(df["label_disease"].astype(str).unique())
     disease_map = {name: i for i, name in enumerate(unique_diseases)}
@@ -84,8 +84,8 @@ def get_data_splits(csv_path, test_size=0.2, val_size=0.1, random_state=42):
     ].unique()
     condition_map = {name: i for i, name in enumerate(sorted(valid_conds))}
 
-    print(f"Disease classes ({len(disease_map)}): {disease_map}")
-    print(f"Condition classes ({len(condition_map)}): {condition_map}")
+    print(f"disease classes ({len(disease_map)}): {disease_map}")
+    print(f"condition classes ({len(condition_map)}): {condition_map}")
 
     patients = df[["patient_id", "label_disease"]].drop_duplicates()
     total_held_out = test_size + val_size
@@ -104,9 +104,9 @@ def get_data_splits(csv_path, test_size=0.2, val_size=0.1, random_state=42):
     val_df   = df[df["patient_id"].isin(val_pat["patient_id"])]
     test_df  = df[df["patient_id"].isin(test_pat["patient_id"])]
 
-    print(f"Train: {len(train_df)} imgs ({len(train_pat)} patients)")
-    print(f"Val:   {len(val_df)} imgs ({len(val_pat)} patients)")
-    print(f"Test:  {len(test_df)} imgs ({len(test_pat)} patients)")
+    print(f"train: {len(train_df)} imgs ({len(train_pat)} patients)")
+    print(f"val:   {len(val_df)} imgs ({len(val_pat)} patients)")
+    print(f"test:  {len(test_df)} imgs ({len(test_pat)} patients)")
 
     return train_df, val_df, test_df, disease_map, condition_map
 

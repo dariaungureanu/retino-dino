@@ -14,7 +14,7 @@ class OCTDL_SSL_Dataset(Dataset):
         for ext in extensions:
             self.image_paths.extend(glob.glob(os.path.join(root_dir, '**', ext), recursive=True))
 
-        print(f"Found {len(self.image_paths)} images.")
+        print(f"found {len(self.image_paths)} images.")
 
         self.img_size = 224
 
@@ -46,5 +46,5 @@ class OCTDL_SSL_Dataset(Dataset):
             g2 = self.global_transfo2(image)
             return g1, g2
         except Exception as e:
-            print(f"Error loading {self.image_paths[idx]}: {e}")
+            print(f"error loading {self.image_paths[idx]}: {e}")
             return self.__getitem__((idx + 1) % len(self))

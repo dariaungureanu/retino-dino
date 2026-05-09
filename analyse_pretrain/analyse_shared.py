@@ -46,7 +46,7 @@ def build_samples(
 
     if split_col and split_name:
         df = df[df[split_col] == split_name].copy()
-        print(f"Filtered {split_col}=={split_name}: {len(df)} rows remain")
+        print(f"filtered {split_col}=={split_name}: {len(df)} rows remain")
 
     samples = []
     missing = 0
@@ -68,7 +68,7 @@ def build_samples(
 
     if missing > 0:
         print(f"WARNING: {missing} images not found on disk, skipped")
-    print(f"Built {len(samples)} samples")
+    print(f"built {len(samples)} samples")
     return samples
 
 
@@ -107,44 +107,44 @@ def load_model(
     device: torch.device,
 ) -> torch.nn.Module:
     print("loading model")
-    print(f"Architecture: {arch}")
+    print(f"architecture: {arch}")
     model = torch.hub.load("facebookresearch/dinov2", arch)
     model_keys = set(model.state_dict().keys())
-    print(f"Hub model has {len(model_keys)} parameter tensors")
+    print(f"hub model has {len(model_keys)} parameter tensors")
 
     if checkpoint is None:
-        print("No checkpoint - using ORIGINAL ImageNet weights (baseline)")
+        print("no checkpoint - using ORIGINAL ImageNet weights (baseline)")
         model.eval().to(device)
         return model
 
     if not os.path.isfile(checkpoint):
-        print(f"Checkpoint file not found: {checkpoint}")
+        print(f"checkpoint file not found: {checkpoint}")
         sys.exit(1)
 
-    print(f"Checkpoint: {checkpoint}")
+    print(f"checkpoint: {checkpoint}")
     ckpt = torch.load(checkpoint, map_location="cpu")
 
     if not isinstance(ckpt, dict):
-        print(f"Expected dict, got {type(ckpt)}")
+        print(f"expected dict, got {type(ckpt)}")
         sys.exit(1)
 
-    print(f"Top-level keys: {list(ckpt.keys())}")
+    print(f"top-level keys: {list(ckpt.keys())}")
 
     if "model" in ckpt:
         st = ckpt["model"]
-        print(f"Extracted 'model' sub-dict ({len(st)} keys)")
+        print(f"extracted 'model' sub-dict ({len(st)} keys)")
     elif "teacher" in ckpt:
         st = ckpt["teacher"]
-        print(f"Extracted 'teacher' sub-dict ({len(st)} keys)")
+        print(f"extracted 'teacher' sub-dict ({len(st)} keys)")
     elif "state_dict" in ckpt:
         st = ckpt["state_dict"]
-        print(f"Extracted 'state_dict' sub-dict ({len(st)} keys)")
+        print(f"extracted 'state_dict' sub-dict ({len(st)} keys)")
     else:
         st = ckpt
-        print("No recognized sub-dict, using top-level")
+        print("no recognized sub-dict, using top-level")
 
     raw_keys = list(st.keys())[:10]
-    print("Raw keys (first 10):")
+    print("raw keys (first 10):")
     for k in raw_keys:
         print(f"{k}")
 
@@ -176,7 +176,7 @@ def load_model(
                 break
 
     if not clean:
-        print("No prefix pattern matched cleanly. Trying teacher.backbone.* forcefully...")
+        print("no prefix pattern matched cleanly. Trying teacher.backbone.* forcefully...")
         for k, v in st.items():
             for prefix in ["teacher.backbone.", "student.backbone.", "backbone.", "module."]:
                 if k.startswith(prefix):
@@ -184,8 +184,8 @@ def load_model(
                     matched_prefix = prefix
                     break
 
-    print(f"Matched prefix: '{matched_prefix}'")
-    print(f"Cleaned keys ({len(clean)} total, first 5): {list(clean.keys())[:5]}")
+    print(f"matched prefix: '{matched_prefix}'")
+    print(f"cleaned keys ({len(clean)} total, first 5): {list(clean.keys())[:5]}")
 
     if "pos_embed" in clean and "pos_embed" in model_keys:
         ckpt_pos = clean["pos_embed"]
@@ -204,7 +204,7 @@ def load_model(
             grid_ckpt = int(n_patches_ckpt ** 0.5)
             grid_model = int(n_patches_model ** 0.5)
 
-            print(f"Interpolating pos_embed: {grid_ckpt}x{grid_ckpt} -> "
+            print(f"interpolating pos_embed: {grid_ckpt}x{grid_ckpt} -> "
                   f"{grid_model}x{grid_model}")
 
             d = patch_pos.shape[-1]
@@ -227,22 +227,21 @@ def load_model(
     loaded = len(model_keys) - len(result.missing_keys)
     total = len(model_keys)
 
-    print("\nResult ")
-    print(f"Loaded: {loaded}/{total} keys")
+    print("\nresult ")
+    print(f"loaded: {loaded}/{total} keys")
 
     if result.missing_keys:
-        print(f"Missing (first 5): {result.missing_keys[:5]}")
+        print(f"missing (first 5): {result.missing_keys[:5]}")
     if result.unexpected_keys:
-        print(f"Unexpected (first 5): {result.unexpected_keys[:5]}")
+        print(f"unexpected (first 5): {result.unexpected_keys[:5]}")
 
     if loaded == 0:
-        print("\nZero keys loaded! Model has ImageNet weights, not yours!")
-        print("Likely cause: key prefix mismatch")
+        print("\nno keys loaded - probably a prefix mismatch")
         sys.exit(1)
     elif loaded < total * 0.9:
-        print(f"\nOnly {loaded}/{total} keys - partial load")
+        print(f"\nonly {loaded}/{total} keys loaded")
     else:
-        print("\nDomain-adapted weights loaded successfully")
+        print("\ndomain-adapted weights loaded successfully")
 
     model.eval().to(device)
     return model
@@ -275,7 +274,7 @@ def add_common_args(parser):
 
 def get_device():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Device: {device}")
+    print(f"device: {device}")
     return device
 
 
@@ -284,5 +283,5 @@ def validate_img_size(img_size: int, patch_size: int = 14):
         print(f"img_size={img_size} not divisible by {patch_size}. "
               "Positional embeddings will be interpolated.")
     grid = img_size // patch_size
-    print(f"Resolution {img_size}x{img_size} -> {grid}x{grid} = {grid**2} patches")
+    print(f"resolution {img_size}x{img_size} -> {grid}x{grid} = {grid**2} patches")
     return grid

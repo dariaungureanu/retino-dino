@@ -100,14 +100,14 @@ def load_and_split_data(
 
     if missing > 0:
         print(f"WARNING: {missing} images not found, skipped")
-    print(f"Resolved {len(paths)} images across {len(set(labels))} classes")
+    print(f"resolved {len(paths)} images across {len(set(labels))} classes")
 
     unique, counts = np.unique(labels, return_counts=True)
     for cls, cnt in sorted(zip(unique, counts), key=lambda x: -x[1]):
         print(f"{cls}: {cnt} ({cnt/len(labels):.1%})")
 
     if "patient_id" in df.columns:
-        print("Using patient-wise stratified split (no data leakage)")
+        print("using patient-wise stratified split (no data leakage)")
         valid_df = df.iloc[:len(paths)].copy()
         valid_df["_path"] = paths
         valid_df["_label"] = labels
@@ -132,15 +132,15 @@ def load_and_split_data(
             test_paths = valid_df.loc[test_mask, "_path"].tolist()
             test_labels = valid_df.loc[test_mask, "_label"].tolist()
 
-            print(f"Split: {len(train_paths)} train, {len(test_paths)} test "
+            print(f"split: {len(train_paths)} train, {len(test_paths)} test "
                   f"({len(train_patients)} / {len(test_patients)} patients)")
             return train_paths, train_labels, test_paths, test_labels
 
         except ValueError as e:
-            print(f"Patient-wise split failed ({e}), falling back to image-level")
+            print(f"patient-wise split failed ({e}), falling back to image-level")
 
     # Fallback: image-level stratified split
-    print("Using image-level stratified split")
+    print("using image-level stratified split")
     indices = np.arange(len(paths))
     try:
         train_idx, test_idx = train_test_split(
@@ -148,7 +148,7 @@ def load_and_split_data(
             random_state=random_state, stratify=labels,
         )
     except ValueError:
-        print("Stratified split failed (likely too few samples in some class), "
+        print("stratified split failed (likely too few samples in some class), "
               "using random split")
         train_idx, test_idx = train_test_split(
             indices, test_size=test_size, random_state=random_state,
@@ -159,7 +159,7 @@ def load_and_split_data(
     test_paths = [paths[i] for i in test_idx]
     test_labels = [labels[i] for i in test_idx]
 
-    print(f"Split: {len(train_paths)} train, {len(test_paths)} test")
+    print(f"split: {len(train_paths)} train, {len(test_paths)} test")
     return train_paths, train_labels, test_paths, test_labels
 
 
@@ -199,7 +199,7 @@ def extract_features(
     features = np.concatenate(all_feats, axis=0)
     labels = np.concatenate(all_labels, axis=0)
 
-    print(f"Extracted features: shape={features.shape}, "
+    print(f"extracted features: shape={features.shape}, "
           f"dtype={features.dtype}")
     return features, labels
 
@@ -230,9 +230,9 @@ def eval_knn(
     }
 
     print(f"\nkNN (k={k}):")
-    print(f"Accuracy:          {metrics['accuracy']:.4f}")
-    print(f"Balanced Accuracy:  {metrics['balanced_accuracy']:.4f}")
-    print(f"Macro-F1:           {metrics['macro_f1']:.4f}")
+    print(f"accuracy:          {metrics['accuracy']:.4f}")
+    print(f"balanced Accuracy:  {metrics['balanced_accuracy']:.4f}")
+    print(f"macro-F1:           {metrics['macro_f1']:.4f}")
 
     return metrics
 
@@ -269,11 +269,11 @@ def eval_linear_probe(
         "per_class_report": report,
     }
 
-    print("\nLinear Probe:")
-    print(f"Accuracy:          {metrics['accuracy']:.4f}")
-    print(f"Balanced Accuracy:  {metrics['balanced_accuracy']:.4f}")
-    print(f"Macro-F1:           {metrics['macro_f1']:.4f}")
-    print("\nPer-class report:")
+    print("\nlinear Probe:")
+    print(f"accuracy:          {metrics['accuracy']:.4f}")
+    print(f"balanced Accuracy:  {metrics['balanced_accuracy']:.4f}")
+    print(f"macro-F1:           {metrics['macro_f1']:.4f}")
+    print("\nper-class report:")
     print(classification_report(y_test, pred, zero_division=0))
 
     return metrics
@@ -377,7 +377,7 @@ def main():
     with open(out_json, "w", encoding="utf-8") as f:
         json.dump(result, f, indent=2)
 
-    print(f"\nResults saved: {out_json}")
+    print(f"\nresults saved: {out_json}")
 
 
 

@@ -140,7 +140,7 @@ def extract_cls_tokens(
 
     features = np.concatenate(all_feats, axis=0)
     labels = np.concatenate(all_labels, axis=0)
-    print(f"Extracted: {features.shape[0]} vectors, dim={features.shape[1]}")
+    print(f"extracted: {features.shape[0]} vectors, dim={features.shape[1]}")
     return features, labels
 
 
@@ -154,7 +154,7 @@ def run_umap(
 ) -> np.ndarray:
     """Project features to 2D via UMAP."""
 
-    print(f"Running UMAP (n_neighbors={n_neighbors}, min_dist={min_dist})...")
+    print(f"running UMAP (n_neighbors={n_neighbors}, min_dist={min_dist})...")
 
     # standardize before UMAP for stable projection
     scaler = StandardScaler()
@@ -169,7 +169,7 @@ def run_umap(
         verbose=True,
     )
     embedding = reducer.fit_transform(features_scaled)
-    print(f"Done. Output shape: {embedding.shape}")
+    print(f"done. Output shape: {embedding.shape}")
     return embedding
 
 
@@ -246,7 +246,7 @@ def save_umap_plot(
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     fig.savefig(out_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
-    print(f"Saved plot: {out_path}")
+    print(f"saved plot: {out_path}")
 
 
 # Main
@@ -364,7 +364,7 @@ def main():
         features=features,
         labels=label_array,
     )
-    print(f"Raw data saved: {npz_path}")
+    print(f"raw data saved: {npz_path}")
     print(f"\n[TIP] To replot without re-extracting features, load {npz_path} directly.")
 
 

@@ -72,12 +72,12 @@ def load_corina_splits(csv_path, root_dir, val_size=0.1, random_state=42):
     Train/test is predefined. Val is carved from train (patient-stratified).
     """
     df = pd.read_csv(csv_path)
-    print(f"Loaded {len(df)} rows from {csv_path}")
+    print(f"loaded {len(df)} rows from {csv_path}")
 
     train_full = df[df["split"] == "train"].copy()
     test_df = df[df["split"] == "test"].copy()
 
-    print(f"Predefined: {len(train_full)} train, {len(test_df)} test")
+    print(f"predefined: {len(train_full)} train, {len(test_df)} test")
 
     for split_name, split_df in [("Train", train_full), ("Test", test_df)]:
         dist = {bm: int(split_df[bm].sum()) for bm in BIOMARKERS}
@@ -99,8 +99,8 @@ def load_corina_splits(csv_path, root_dir, val_size=0.1, random_state=42):
             stratify=train_patients["strat_key"].values,
         )
     except ValueError:
-        # Fall back to random split if stratification fails (too few patients per class).
-        print("Stratified val split failed, using random split")
+        # stratify can fail with too few patients per class
+        print("stratified val split failed, using random split")
         train_pat, val_pat = train_test_split(
             train_patients.index.to_numpy(),
             test_size=val_size,
@@ -110,8 +110,8 @@ def load_corina_splits(csv_path, root_dir, val_size=0.1, random_state=42):
     train_df = train_full[train_full["patient_id"].isin(train_pat)]
     val_df = train_full[train_full["patient_id"].isin(val_pat)]
 
-    print(f"After val split: {len(train_df)} train, {len(val_df)} val, {len(test_df)} test")
-    print(f"Patients: train={len(train_pat)}, val={len(val_pat)}, "
+    print(f"after val split: {len(train_df)} train, {len(val_df)} val, {len(test_df)} test")
+    print(f"patients: train={len(train_pat)}, val={len(val_pat)}, "
           f"test={test_df['patient_id'].nunique()}")
 
     return train_df, val_df, test_df

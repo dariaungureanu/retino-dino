@@ -35,7 +35,7 @@ THRESHOLD = 0.5
 
 
 def load_model(model_path, device):
-    print(f"Loading: {model_path}")
+    print(f"loading: {model_path}")
     ckpt = torch.load(model_path, map_location=device)
     config = ckpt["config"]
 
@@ -98,7 +98,7 @@ def plot_tsne(features, labels, out_path, perplexity=30):
                     alpha=0.7, s=40, edgecolors="white", linewidths=0.3)
 
     plt.title("t-SNE - Biomarker Combination Feature Space", fontsize=14, fontweight="bold")
-    plt.legend(bbox_to_anchor=(1.02, 1), loc="upper left", fontsize=9, title="Biomarkers")
+    plt.legend(bbox_to_anchor=(1.02, 1), loc="upper left", fontsize=9, title="biomarkers")
     plt.xlabel("t-SNE 1")
     plt.ylabel("t-SNE 2")
     plt.tight_layout()
@@ -152,7 +152,7 @@ def generate_per_biomarker_gradcam(model, dataset, sample_indices,
     """For each sample show Original + GradCAM for EACH biomarker (side by side)."""
 
     if len(sample_indices) == 0:
-        print(f"No samples for: {title}")
+        print(f"no samples for: {title}")
         return
 
     for p in model.backbone.parameters():
@@ -188,7 +188,7 @@ def generate_per_biomarker_gradcam(model, dataset, sample_indices,
             cam = GradCAM(model=wrapper, target_layers=target_layers,
                           reshape_transform=reshape_transform_vit)
 
-            # Always target the single output of the wrapper (the "present" logit).
+            # wrapper output is single-channel
             cam_map = cam(input_tensor=img_input,
                           targets=[ClassifierOutputTarget(0)])[0]
 
@@ -303,7 +303,7 @@ def main():
                 title=f"GradCAM - {bm} Detection Errors",
             )
 
-    print(f"\nAll outputs: {args.out_dir}")
+    print(f"\nall outputs: {args.out_dir}")
 
 
 if __name__ == "__main__":

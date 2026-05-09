@@ -53,7 +53,7 @@ from model import OCTDLMultiTaskModel, load_backbone
 
 
 def load_model_from_checkpoint(model_path, device):
-    print(f"Loading checkpoint: {model_path}")
+    print(f"loading checkpoint: {model_path}")
     ckpt = torch.load(model_path, map_location=device)
 
     config = ckpt["config"]
@@ -123,7 +123,7 @@ def plot_tsne(features, labels, label_map, title, save_path,
     labels = labels[valid_mask]
 
     if len(features) == 0:
-        print(f"No valid samples for t-SNE: {title}")
+        print(f"no valid samples for t-SNE: {title}")
         return
 
     print(f"[t-SNE] Computing projection for {len(features)} samples...")
@@ -143,7 +143,7 @@ def plot_tsne(features, labels, label_map, title, save_path,
         )
 
     plt.title(title, fontsize=15, fontweight="bold")
-    plt.legend(bbox_to_anchor=(1.02, 1), loc="upper left", title="Class", fontsize=10)
+    plt.legend(bbox_to_anchor=(1.02, 1), loc="upper left", title="class", fontsize=10)
     plt.xlabel("t-SNE 1", fontsize=11)
     plt.ylabel("t-SNE 2", fontsize=11)
     plt.tight_layout()
@@ -235,7 +235,7 @@ def generate_gradcam_grid(
     """GradCAM grid: original | CAM for predicted | CAM for true."""
 
     if len(sample_indices) == 0:
-        print(f"No samples for GradCAM: {task_name}")
+        print(f"no samples for GradCAM: {task_name}")
         return
 
     for p in model.backbone.parameters():
@@ -346,7 +346,7 @@ def main():
         test_ds, batch_size=args.batch_size, shuffle=False,
         num_workers=args.num_workers, pin_memory=True,
     )
-    print(f"Test set: {len(test_ds)} images")
+    print(f"test set: {len(test_ds)} images")
 
     if not args.skip_tsne:
         print("T-SNE VISUALIZATION")
@@ -422,9 +422,9 @@ def main():
                     save_path=os.path.join(args.out_dir, f"gradcam_condition_errors_{cls_name}.png"),
                 )
             else:
-                print(f"Class '{cls_name}' not found in disease or condition maps")
+                print(f"class '{cls_name}' not found in disease or condition maps")
 
-    print(f"\nAll outputs saved to: {args.out_dir}")
+    print(f"\nall outputs saved to: {args.out_dir}")
 
 
 if __name__ == "__main__":

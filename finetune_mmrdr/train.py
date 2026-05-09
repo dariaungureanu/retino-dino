@@ -213,7 +213,7 @@ def main():
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Device: {device}")
+    print(f"device: {device}")
     os.makedirs(args.save_dir, exist_ok=True)
 
     train_df, val_df, test_df, num_classes = load_mmrdr_splits(
@@ -233,7 +233,7 @@ def main():
     test_loader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False,
                              num_workers=args.num_workers, pin_memory=True)
 
-    print(f"Batches: train={len(train_loader)}, val={len(val_loader)}, test={len(test_loader)}")
+    print(f"batches: train={len(train_loader)}, val={len(val_loader)}, test={len(test_loader)}")
 
     backbone = load_backbone(args.arch, args.checkpoint, device)
     model = MMRDRModel(
@@ -281,10 +281,10 @@ def main():
         elapsed = time.time() - t0
         lr = optimizer.param_groups[0]["lr"]
 
-        print(f"Epoch {epoch:02d}/{args.epochs} ({elapsed:.0f}s) lr={lr:.2e}")
-        print(f"Train  loss={t_loss:.4f}  F1={t_met['macro_f1']:.4f}  "
+        print(f"epoch {epoch:02d}/{args.epochs} ({elapsed:.0f}s) lr={lr:.2e}")
+        print(f"train  loss={t_loss:.4f}  F1={t_met['macro_f1']:.4f}  "
               f"AUC={t_met['auc_roc']:.4f}  Kappa={t_met['kappa']:.4f}")
-        print(f"Val    loss={v_loss:.4f}  F1={v_met['macro_f1']:.4f}  "
+        print(f"val    loss={v_loss:.4f}  F1={v_met['macro_f1']:.4f}  "
               f"AUC={v_met['auc_roc']:.4f}  Kappa={v_met['kappa']:.4f}  "
               f"(best_f1={best_val_f1:.4f})")
 
@@ -326,11 +326,11 @@ def main():
     test_met = evaluate_test(model, test_loader, criterion, device, num_classes, args.save_dir)
 
     print("final results")
-    print(f"Accuracy:     {test_met['acc']:.2f}%")
-    print(f"Balanced Acc: {test_met['bal_acc']:.2f}%")
-    print(f"Macro-F1:     {test_met['macro_f1']:.4f}")
+    print(f"accuracy:     {test_met['acc']:.2f}%")
+    print(f"balanced Acc: {test_met['bal_acc']:.2f}%")
+    print(f"macro-F1:     {test_met['macro_f1']:.4f}")
     print(f"AUC-ROC:      {test_met['auc_roc']:.4f}")
-    print(f"Kappa:        {test_met['kappa']:.4f}")
+    print(f"kappa:        {test_met['kappa']:.4f}")
 
     results = {
         "checkpoint": args.checkpoint or "ImageNet baseline",
@@ -349,7 +349,7 @@ def main():
         "test/kappa": test_met["kappa"],
     })
     wandb.finish()
-    print("Done.")
+    print("done.")
 
 
 if __name__ == "__main__":

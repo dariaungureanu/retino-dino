@@ -124,7 +124,6 @@ def main():
         test_df, args.data_path, eval_transform, disease_map, condition_map,
     )
 
-    # Collect predictions to find confident correct samples per disease
     softmax = nn.Softmax(dim=1)
     all_preds_d, all_preds_c, all_labels_d, all_labels_c = [], [], [], []
     all_conf_d = []
@@ -173,7 +172,7 @@ def main():
         confs = all_conf_d[indices]
 
         if len(indices) == 0:
-            print(f"No correct predictions for {disease_name}")
+            print(f"no correct predictions for {disease_name}")
             continue
 
         # Top-K most confident
@@ -224,7 +223,7 @@ def main():
             # Column 1: Original
             axes[i, 0].imshow(rgb_img)
             axes[i, 0].set_title(
-                f"Disease: {pred_disease_name} ({conf_d_val:.0%})\n"
+                f"disease: {pred_disease_name} ({conf_d_val:.0%})\n"
                 f"Condition: {pred_cond_name} ({conf_c_val:.0%})\n"
                 f"True cond: {true_cond_name}",
                 fontsize=9,
@@ -234,7 +233,7 @@ def main():
             # Column 2: Disease head GradCAM
             axes[i, 1].imshow(vis_d)
             axes[i, 1].set_title(
-                f"Disease Head -> {pred_disease_name}",
+                f"disease Head -> {pred_disease_name}",
                 fontsize=10, fontweight="bold", color="#1565C0",
             )
             axes[i, 1].axis("off")
@@ -242,14 +241,14 @@ def main():
             # Column 3: Condition head GradCAM
             axes[i, 2].imshow(vis_c)
             axes[i, 2].set_title(
-                f"Condition Head -> {pred_cond_name}",
+                f"condition Head -> {pred_cond_name}",
                 fontsize=10, fontweight="bold", color="#C62828",
             )
             axes[i, 2].axis("off")
 
         expected_str = ", ".join(expected_conds) if expected_conds else "?"
         fig.suptitle(
-            f"Disease vs Condition Attention - {disease_name}\n"
+            f"disease vs Condition Attention - {disease_name}\n"
             f"(Expected conditions: {expected_str})",
             fontsize=14, fontweight="bold", y=1.02,
         )
@@ -259,7 +258,7 @@ def main():
         plt.close(fig)
         print(f"{save_path}")
 
-    print(f"\nAll outputs: {args.out_dir}")
+    print(f"\nall outputs: {args.out_dir}")
 
 
 if __name__ == "__main__":

@@ -35,7 +35,7 @@ from model import OCTDLMultiTaskModel, load_backbone
 
 
 def load_model_from_checkpoint(model_path, device):
-    print(f"Loading checkpoint: {model_path}")
+    print(f"loading checkpoint: {model_path}")
     ckpt = torch.load(model_path, map_location=device)
 
     config = ckpt["config"]
@@ -145,7 +145,6 @@ def main():
     parser.add_argument("--num_workers", type=int, default=4)
     args = parser.parse_args()
 
-    # Find checkpoint
     if args.model_path:
         model_path = args.model_path
     elif args.checkpoint_dir:
@@ -159,13 +158,11 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     os.makedirs(args.out_dir, exist_ok=True)
 
-    # Load model
     model, ckpt = load_model_from_checkpoint(model_path, device)
     config = ckpt["config"]
     disease_map = ckpt["disease_map"]
     condition_map = ckpt["condition_map"]
 
-    # Build test set (same split as training)
     csv_path = os.path.join(args.data_path, "OCTDL_clean_metadata.csv")
     _, _, test_df, _, _ = get_data_splits(csv_path)
 
@@ -177,31 +174,26 @@ def main():
         test_ds, batch_size=args.batch_size, shuffle=False,
         num_workers=args.num_workers, pin_memory=True,
     )
-    print(f"Test set: {len(test_ds)} images")
+    print(f"test set: {len(test_ds)} images")
 
-    # Get predictions
     preds_d, labels_d, preds_c, labels_c = get_predictions(model, test_loader, device)
 
-    # Disease confusion matrices
     inv_disease = {v: k for k, v in disease_map.items()}
     disease_names = [inv_disease[i] for i in range(len(disease_map))]
 
-    # Raw counts
     plot_confusion_matrix(
         labels_d, preds_d, disease_names,
-        title="Disease Classification - Confusion Matrix (Counts)",
+        title="disease Classification - Confusion Matrix (Counts)",
         save_path=os.path.join(args.out_dir, "disease_confusion_counts.png"),
     )
 
-    # Normalized (recall %)
     plot_confusion_matrix(
         labels_d, preds_d, disease_names,
-        title="Disease Classification - Confusion Matrix (Recall %)",
+        title="disease Classification - Confusion Matrix (Recall %)",
         save_path=os.path.join(args.out_dir, "disease_confusion_normalized.png"),
         normalize=True,
     )
 
-    # Condition confusion matrices
     cond_mask = labels_c != IGNORE_INDEX
     if cond_mask.sum() > 0:
         valid_preds_c = preds_c[cond_mask]
@@ -210,24 +202,21 @@ def main():
         inv_condition = {v: k for k, v in condition_map.items()}
         condition_names = [inv_condition[i] for i in range(len(condition_map))]
 
-        # Raw counts
         plot_confusion_matrix(
             valid_labels_c, valid_preds_c, condition_names,
-            title="Condition Classification - Confusion Matrix (Counts)",
+            title="condition Classification - Confusion Matrix (Counts)",
             save_path=os.path.join(args.out_dir, "condition_confusion_counts.png"),
         )
 
-        # Normalized (recall %)
         plot_confusion_matrix(
             valid_labels_c, valid_preds_c, condition_names,
-            title="Condition Classification - Confusion Matrix (Recall %)",
+            title="condition Classification - Confusion Matrix (Recall %)",
             save_path=os.path.join(args.out_dir, "condition_confusion_normalized.png"),
             normalize=True,
         )
     else:
-        print("No valid condition labels in test set - skipping condition matrix")
+        print("no valid condition labels in test set - skipping condition matrix")
 
-    # Classification reports
     print("DISEASE Report")
     print(classification_report(labels_d, preds_d, target_names=disease_names, zero_division=0))
 
@@ -238,7 +227,7 @@ def main():
             target_names=condition_names, zero_division=0,
         ))
 
-    print(f"\nAll outputs saved to: {args.out_dir}")
+    print(f"\nall outputs saved to: {args.out_dir}")
 
 
 if __name__ == "__main__":

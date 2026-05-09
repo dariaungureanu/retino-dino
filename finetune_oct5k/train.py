@@ -169,9 +169,9 @@ def evaluate_test(model, loader, criterion, device, biomarkers, out_dir):
               f"AUC={metrics[f'auc_{bm}']:.4f}  "
               f"Acc={metrics[f'acc_{bm}']:.1f}%")
 
-    print(f"\nMacro F1:     {metrics['f1_macro']:.4f}")
-    print(f"Macro AUC:    {metrics['auc_macro']:.4f}")
-    print(f"Exact Match:  {metrics['exact_match']:.1f}%")
+    print(f"\nmacro F1:     {metrics['f1_macro']:.4f}")
+    print(f"macro AUC:    {metrics['auc_macro']:.4f}")
+    print(f"exact Match:  {metrics['exact_match']:.1f}%")
 
     # Confusion matrices
     n_bm = len(biomarkers)
@@ -233,14 +233,14 @@ def main():
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Device: {device}")
+    print(f"device: {device}")
     os.makedirs(args.save_dir, exist_ok=True)
 
     train_df, val_df, test_df, active_biomarkers = load_oct5k_splits(
         args.csv, args.data_path, drop_rare=args.drop_rare,
     )
     num_labels = len(active_biomarkers)
-    print(f"Active biomarkers ({num_labels}): {[SHORT_NAMES[b] for b in active_biomarkers]}")
+    print(f"active biomarkers ({num_labels}): {[SHORT_NAMES[b] for b in active_biomarkers]}")
 
     pos_weights = compute_pos_weights(train_df, active_biomarkers).to(device)
 
@@ -256,7 +256,7 @@ def main():
     test_loader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False,
                              num_workers=args.num_workers, pin_memory=True)
 
-    print(f"Batches: train={len(train_loader)}, val={len(val_loader)}, test={len(test_loader)}")
+    print(f"batches: train={len(train_loader)}, val={len(val_loader)}, test={len(test_loader)}")
 
     backbone = load_backbone(args.arch, args.checkpoint, device)
     model = OCT5kModel(
@@ -300,10 +300,10 @@ def main():
         elapsed = time.time() - t0
         lr = optimizer.param_groups[0]["lr"]
 
-        print(f"Epoch {epoch:02d}/{args.epochs} ({elapsed:.0f}s) lr={lr:.2e}")
-        print(f"Train  loss={t_loss:.4f}  F1_macro={t_met['f1_macro']:.4f}  "
+        print(f"epoch {epoch:02d}/{args.epochs} ({elapsed:.0f}s) lr={lr:.2e}")
+        print(f"train  loss={t_loss:.4f}  F1_macro={t_met['f1_macro']:.4f}  "
               f"AUC_macro={t_met['auc_macro']:.4f}")
-        print(f"Val    loss={v_loss:.4f}  F1_macro={v_met['f1_macro']:.4f}  "
+        print(f"val    loss={v_loss:.4f}  F1_macro={v_met['f1_macro']:.4f}  "
               f"AUC_macro={v_met['auc_macro']:.4f}  "
               f"(best_f1={best_val_f1:.4f})")
 
@@ -335,7 +335,7 @@ def main():
                 "num_labels": num_labels,
                 "biomarkers": active_biomarkers,
             }, save_path)
-            print(f"New best! Saved -> {save_path}")
+            print(f"new best! Saved -> {save_path}")
         else:
             patience_counter += 1
             if patience_counter >= args.patience:
@@ -370,7 +370,7 @@ def main():
     with open(json_path, "w") as f:
         json.dump(results, f, indent=2)
     print(f"\n{json_path}")
-    print("Done.")
+    print("done.")
 
 
 if __name__ == "__main__":

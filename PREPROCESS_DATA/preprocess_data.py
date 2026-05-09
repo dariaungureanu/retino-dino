@@ -91,7 +91,7 @@ def process_images(source_root, dest_root, csv_filename):
     if not os.path.exists(csv_path):
         raise FileNotFoundError(f"CSV not found at: {csv_path}")
 
-    print(f"Loading CSV from: {csv_path}")
+    print(f"loading CSV from: {csv_path}")
     df = pd.read_csv(csv_path)
 
     df = prepare_metadata(df)
@@ -100,7 +100,7 @@ def process_images(source_root, dest_root, csv_filename):
 
     valid_rows = []
 
-    print(f"Starting image processing. Saving to: {dest_root}")
+    print(f"starting image processing. Saving to: {dest_root}")
     for idx, row in tqdm(df.iterrows(), total=len(df)):
         try:
             src_path = build_image_path(row, source_root)
@@ -131,17 +131,17 @@ def process_images(source_root, dest_root, csv_filename):
             valid_rows.append(row)
 
         except Exception as e:
-            print(f"Error processing image {idx}: {e}")
+            print(f"error processing image {idx}: {e}")
             continue
 
     new_df = pd.DataFrame(valid_rows)
     output_csv_path = os.path.join(dest_root, "OCTDL_clean_metadata.csv")
     new_df.to_csv(output_csv_path, index=False)
-    print("Processing Complete!")
-    print(f"Original images: {len(df)}")
-    print(f"Successfully processed: {len(new_df)}")
-    print(f"New CSV saved at: {output_csv_path}")
-    print(f"Cleaned images folder: {dest_root}")
+    print("processing Complete!")
+    print(f"original images: {len(df)}")
+    print(f"successfully processed: {len(new_df)}")
+    print(f"new CSV saved at: {output_csv_path}")
+    print(f"cleaned images folder: {dest_root}")
 
 
 if __name__ == "__main__":

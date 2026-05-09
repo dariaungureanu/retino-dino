@@ -77,13 +77,13 @@ def load_oct5k_splits(csv_path, root_dir, test_size=0.2, val_size=0.1,
     set to 15 to drop Fluid (only 14 images). None keeps everything.
     """
     df = pd.read_csv(csv_path)
-    print(f"Loaded {len(df)} rows from {csv_path}")
+    print(f"loaded {len(df)} rows from {csv_path}")
 
     active_biomarkers = BIOMARKERS.copy()
     if drop_rare:
         for bm in BIOMARKERS:
             if df[bm].sum() < drop_rare:
-                print(f"Dropping {bm} (only {int(df[bm].sum())} positive images)")
+                print(f"dropping {bm} (only {int(df[bm].sum())} positive images)")
                 active_biomarkers.remove(bm)
 
     patients = df["patient_id"].unique()
@@ -103,7 +103,7 @@ def load_oct5k_splits(csv_path, root_dir, test_size=0.2, val_size=0.1,
     val_df = df[df["patient_id"].isin(val_pat)]
     test_df = df[df["patient_id"].isin(test_pat)]
 
-    print(f"Split: {len(train_df)} train ({len(train_pat)} patients), "
+    print(f"split: {len(train_df)} train ({len(train_pat)} patients), "
           f"{len(val_df)} val ({len(val_pat)} patients), "
           f"{len(test_df)} test ({len(test_pat)} patients)")
 

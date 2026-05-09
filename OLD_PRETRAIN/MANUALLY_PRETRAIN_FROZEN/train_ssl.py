@@ -41,7 +41,7 @@ def main():
     wandb.init(project="Licenta-SSL-Turbo", config=args)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Device: {device}")
+    print(f"device: {device}")
 
     os.makedirs(args.save_dir, exist_ok=True)
 
@@ -56,21 +56,21 @@ def main():
         drop_last=True,
         persistent_workers=True
     )
-    print(f"Loaded {len(dataset)} images. Batch size: {args.batch_size}")
+    print(f"loaded {len(dataset)} images. Batch size: {args.batch_size}")
 
-    print("Loading DINOv2 ViT-Large...")
+    print("loading DINOv2 ViT-Large...")
     student = torch.hub.load('facebookresearch/dinov2', 'dinov2_vitl14').to(device)
 
     for name, param in student.named_parameters():
         if "blocks.23" not in name and "norm" not in name:
             param.requires_grad = False
-    print("Backbone frozen (except last block).")
+    print("backbone frozen (except last block).")
 
     head = SimpleDINOHead(1024).to(device)
     optimizer = optim.AdamW(list(student.parameters()) + list(head.parameters()), lr=args.lr)
     criterion = nn.CrossEntropyLoss()
 
-    print("Starting pre-training...")
+    print("starting pre-training...")
     student.train()
     try:
         for epoch in range(args.epochs):
@@ -101,21 +101,21 @@ def main():
 
             save_path = os.path.join(args.save_dir, "checkpoint_latest.pth")
             torch.save(student.state_dict(), save_path)
-            print(f"Saved: {save_path}")
+            print(f"saved: {save_path}")
 
     except torch.cuda.OutOfMemoryError:
-        print("\nCritical: CUDA out of memory. Saving emergency checkpoint...")
+        print("\ncritical: CUDA out of memory. Saving emergency checkpoint...")
         torch.save(student.state_dict(), os.path.join(args.save_dir, "checkpoint_oom.pth"))
-        print("Emergency save successful: checkpoint_oom.pth")
+        print("emergency save successful: checkpoint_oom.pth")
         torch.cuda.empty_cache()
         raise
 
     except KeyboardInterrupt:
-        print("\nTraining interrupted by user. Saving checkpoint...")
+        print("\ntraining interrupted by user. Saving checkpoint...")
         torch.save(student.state_dict(), os.path.join(args.save_dir, "checkpoint_interrupted.pth"))
-        print("Save successful.")
+        print("save successful.")
 
-    print("Pre-training complete.")
+    print("pre-training complete.")
     wandb.finish()
 
 

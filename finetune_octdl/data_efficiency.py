@@ -148,7 +148,7 @@ def subsample_train_df(train_df, fraction, random_state=42):
     )
 
     subset_df = train_df[train_df["patient_id"].isin(selected)]
-    print(f"Subsampled: {len(subset_df)} images "
+    print(f"subsampled: {len(subset_df)} images "
           f"({len(selected)} patients) = {fraction:.0%} of training set")
     return subset_df
 
@@ -228,11 +228,11 @@ def train_and_evaluate(
             patience_counter += 1
             marker = ""
 
-        print(f"Ep {epoch:02d}  train_f1={t_d['macro_f1']:.3f}  "
+        print(f"ep {epoch:02d}  train_f1={t_d['macro_f1']:.3f}  "
               f"val_f1={v_d['macro_f1']:.3f}  best={best_val_f1:.3f} {marker}")
 
         if patience_counter >= PATIENCE:
-            print(f"Early stop at epoch {epoch}")
+            print(f"early stop at epoch {epoch}")
             break
 
     # Evaluate on test with best checkpoint
@@ -272,7 +272,7 @@ def plot_efficiency_curve(results, fractions, out_dir, label=""):
     ax1.plot(fractions, cond_f1s, "s--", color="#FF9800", linewidth=2, markersize=8, label="Condition Macro-F1")
     ax1.set_xlabel("Training Data Fraction", fontsize=12)
     ax1.set_ylabel("Macro-F1", fontsize=12)
-    ax1.set_title(f"Data Efficiency - Macro-F1 {label}", fontsize=13, fontweight="bold")
+    ax1.set_title(f"data Efficiency - Macro-F1 {label}", fontsize=13, fontweight="bold")
     ax1.set_xticks(fractions)
     ax1.set_xticklabels([f"{f:.0%}\n({n} imgs)" for f, n in zip(fractions, n_imgs)])
     ax1.legend(fontsize=10)
@@ -283,7 +283,7 @@ def plot_efficiency_curve(results, fractions, out_dir, label=""):
     ax2.plot(fractions, accs, "o-", color="#4CAF50", linewidth=2, markersize=8, label="Disease Accuracy")
     ax2.set_xlabel("Training Data Fraction", fontsize=12)
     ax2.set_ylabel("Accuracy (%)", fontsize=12)
-    ax2.set_title(f"Data Efficiency - Accuracy {label}", fontsize=13, fontweight="bold")
+    ax2.set_title(f"data Efficiency - Accuracy {label}", fontsize=13, fontweight="bold")
     ax2.set_xticks(fractions)
     ax2.set_xticklabels([f"{f:.0%}\n({n} imgs)" for f, n in zip(fractions, n_imgs)])
     ax2.legend(fontsize=10)
@@ -317,7 +317,7 @@ def plot_comparison(results_a_path, results_b_path, label_a, label_b, out_dir):
     ax1.plot(fracs_b, f1s_b, "s--", linewidth=2, markersize=8, label=label_b, color="#F44336")
     ax1.set_xlabel("Training Data Fraction", fontsize=12)
     ax1.set_ylabel("Disease Macro-F1", fontsize=12)
-    ax1.set_title("Data Efficiency - Domain-Adapted vs ImageNet", fontsize=13, fontweight="bold")
+    ax1.set_title("data Efficiency - Domain-Adapted vs ImageNet", fontsize=13, fontweight="bold")
     ax1.legend(fontsize=11)
     ax1.grid(True, alpha=0.3)
     ax1.set_ylim([0.4, 1.0])
@@ -326,7 +326,7 @@ def plot_comparison(results_a_path, results_b_path, label_a, label_b, out_dir):
     ax2.plot(fracs_b, accs_b, "s--", linewidth=2, markersize=8, label=label_b, color="#F44336")
     ax2.set_xlabel("Training Data Fraction", fontsize=12)
     ax2.set_ylabel("Disease Accuracy (%)", fontsize=12)
-    ax2.set_title("Data Efficiency - Accuracy Comparison", fontsize=13, fontweight="bold")
+    ax2.set_title("data Efficiency - Accuracy Comparison", fontsize=13, fontweight="bold")
     ax2.legend(fontsize=11)
     ax2.grid(True, alpha=0.3)
     ax2.set_ylim([50, 100])
@@ -369,15 +369,15 @@ def main():
         raise ValueError("--data_path is required")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Device: {device}")
+    print(f"device: {device}")
     os.makedirs(args.out_dir, exist_ok=True)
 
     # fixed val/test across all fractions
     csv_path = os.path.join(args.data_path, "OCTDL_clean_metadata.csv")
     train_df, val_df, test_df, disease_map, condition_map = get_data_splits(csv_path)
 
-    print(f"Full train: {len(train_df)} | Val: {len(val_df)} | Test: {len(test_df)}")
-    print(f"Fractions to test: {args.fractions}")
+    print(f"full train: {len(train_df)} | Val: {len(val_df)} | Test: {len(test_df)}")
+    print(f"fractions to test: {args.fractions}")
 
     checkpoint_label = "domain_adapted" if args.checkpoint else "imagenet_baseline"
 

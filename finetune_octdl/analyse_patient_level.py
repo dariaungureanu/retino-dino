@@ -120,7 +120,7 @@ def main():
     img_d_f1 = f1_score(test_df_reset["true_disease"], all_preds_d,
                          average="macro", zero_division=0)
     img_d_acc = accuracy_score(test_df_reset["true_disease"], all_preds_d)
-    print(f"Disease:   Acc={img_d_acc*100:.1f}%  Macro-F1={img_d_f1:.4f}")
+    print(f"disease:   Acc={img_d_acc*100:.1f}%  Macro-F1={img_d_f1:.4f}")
 
     cond_mask = test_df_reset["true_condition"] != IGNORE_INDEX
     if cond_mask.sum() > 0:
@@ -133,7 +133,7 @@ def main():
             test_df_reset.loc[cond_mask, "true_condition"],
             all_preds_c[cond_mask],
         )
-        print(f"Condition: Acc={img_c_acc*100:.1f}%  Macro-F1={img_c_f1:.4f}")
+        print(f"condition: Acc={img_c_acc*100:.1f}%  Macro-F1={img_c_f1:.4f}")
 
     print("patient-level metrics (majority vote)")
     patient_results = []
@@ -174,7 +174,7 @@ def main():
     pat_df = pd.DataFrame(patient_results)
 
     # Disease, patient-level
-    print(f"\nPatients in test set: {len(pat_df)}")
+    print(f"\npatients in test set: {len(pat_df)}")
     print("\n--- Disease (Majority Vote) ---")
 
     disease_names = [inv_disease[i] for i in range(len(disease_map))]
@@ -186,8 +186,8 @@ def main():
     pat_d_bal_vote = balanced_accuracy_score(pat_true_d, pat_pred_d_vote) * 100
     pat_d_f1_vote = f1_score(pat_true_d, pat_pred_d_vote, average="macro", zero_division=0)
 
-    print(f"Acc={pat_d_acc_vote:.1f}%  Bal.Acc={pat_d_bal_vote:.1f}%  Macro-F1={pat_d_f1_vote:.4f}")
-    print("\nPer-class report (majority vote):")
+    print(f"acc={pat_d_acc_vote:.1f}%  Bal.Acc={pat_d_bal_vote:.1f}%  Macro-F1={pat_d_f1_vote:.4f}")
+    print("\nper-class report (majority vote):")
     print(classification_report(
         pat_true_d, pat_pred_d_vote,
         target_names=disease_names, zero_division=0,
@@ -196,7 +196,7 @@ def main():
     pat_d_acc_avg = accuracy_score(pat_true_d, pat_pred_d_avg) * 100
     pat_d_f1_avg = f1_score(pat_true_d, pat_pred_d_avg, average="macro", zero_division=0)
     print("--- Disease (Average Probabilities) ---")
-    print(f"Acc={pat_d_acc_avg:.1f}%  Macro-F1={pat_d_f1_avg:.4f}")
+    print(f"acc={pat_d_acc_avg:.1f}%  Macro-F1={pat_d_f1_avg:.4f}")
 
     # Condition, patient-level
     valid_pat = pat_df[pat_df["true_condition"] != IGNORE_INDEX]
@@ -206,8 +206,8 @@ def main():
         pat_c_acc = accuracy_score(valid_pat["true_condition"], valid_pat["pred_condition"]) * 100
         pat_c_f1 = f1_score(valid_pat["true_condition"], valid_pat["pred_condition"],
                             average="macro", zero_division=0)
-        print(f"Acc={pat_c_acc:.1f}%  Macro-F1={pat_c_f1:.4f}")
-        print("\nPer-class report:")
+        print(f"acc={pat_c_acc:.1f}%  Macro-F1={pat_c_f1:.4f}")
+        print("\nper-class report:")
         print(classification_report(
             valid_pat["true_condition"], valid_pat["pred_condition"],
             target_names=condition_names, zero_division=0,
@@ -229,7 +229,7 @@ def main():
                 xticklabels=disease_names, yticklabels=disease_names, ax=ax)
     ax.set_xlabel("Predicted", fontweight="bold")
     ax.set_ylabel("True", fontweight="bold")
-    ax.set_title("Patient-Level Disease Confusion Matrix\n(Majority Vote)", fontweight="bold")
+    ax.set_title("patient-Level Disease Confusion Matrix\n(Majority Vote)", fontweight="bold")
     plt.tight_layout()
     cm_path = os.path.join(args.out_dir, "patient_confusion_disease.png")
     fig.savefig(cm_path, dpi=200, bbox_inches="tight")
@@ -263,7 +263,7 @@ def main():
     with open(json_path, "w") as f:
         json.dump(results, f, indent=2)
     print(f"\n{json_path}")
-    print("\nDone.")
+    print("\ndone.")
 
 
 if __name__ == "__main__":

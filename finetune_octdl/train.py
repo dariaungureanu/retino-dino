@@ -188,7 +188,7 @@ def evaluate_test(model, loader, criterion_d, criterion_c, device,
             zero_division=0,
         ))
     else:
-        print("No valid condition labels in test set.")
+        print("no valid condition labels in test set.")
 
     return metrics_d, metrics_c
 
@@ -230,7 +230,7 @@ def main():
 
     # Setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Device: {device}")
+    print(f"device: {device}")
     if device.type == "cuda":
         print(f"GPU: {torch.cuda.get_device_name()}")
         print(f"VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
@@ -241,7 +241,7 @@ def main():
     if args.img_size % 14 != 0:
         print(f"img_size={args.img_size} not divisible by 14 (patch size)!")
     grid = args.img_size // 14
-    print(f"Resolution: {args.img_size}x{args.img_size} -> {grid}x{grid} = {grid**2} patches")
+    print(f"resolution: {args.img_size}x{args.img_size} -> {grid}x{grid} = {grid**2} patches")
 
     # Data
     csv_path = os.path.join(args.data_path, "OCTDL_clean_metadata.csv")
@@ -267,7 +267,7 @@ def main():
     test_loader  = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False,
                               num_workers=args.num_workers, pin_memory=True)
 
-    print(f"Batches per epoch: train={len(train_loader)}, val={len(val_loader)}, test={len(test_loader)}")
+    print(f"batches per epoch: train={len(train_loader)}, val={len(val_loader)}, test={len(test_loader)}")
 
     # Model
     backbone = load_backbone(args.arch, args.checkpoint, device)
@@ -364,10 +364,10 @@ def main():
         current_lr = optimizer.param_groups[0]["lr"]
 
         # Print summary
-        print(f"\nEpoch {epoch:02d}/{args.epochs} ({elapsed:.0f}s)  lr={current_lr:.2e}")
-        print(f"Train  loss={t_loss:.4f}  disease_F1={t_met_d['macro_f1']:.4f}  "
+        print(f"\nepoch {epoch:02d}/{args.epochs} ({elapsed:.0f}s)  lr={current_lr:.2e}")
+        print(f"train  loss={t_loss:.4f}  disease_F1={t_met_d['macro_f1']:.4f}  "
               f"cond_F1={t_met_c['macro_f1']:.4f}")
-        print(f"Val    loss={v_loss:.4f}  disease_F1={v_met_d['macro_f1']:.4f}  "
+        print(f"val    loss={v_loss:.4f}  disease_F1={v_met_d['macro_f1']:.4f}  "
               f"cond_F1={v_met_c['macro_f1']:.4f}  "
               f"(best={best_val_f1:.4f})")
 
@@ -408,7 +408,7 @@ def main():
                 "disease_map": disease_map,
                 "condition_map": condition_map,
             }, save_path)
-            print(f"New best! Saved -> {save_path}")
+            print(f"new best! Saved -> {save_path}")
         else:
             patience_counter += 1
             if patience_counter >= args.patience:
@@ -430,9 +430,9 @@ def main():
     )
 
     print("final results")
-    print(f"Disease:   acc={test_d['acc']:.2f}%  bal_acc={test_d['bal_acc']:.2f}%  "
+    print(f"disease:   acc={test_d['acc']:.2f}%  bal_acc={test_d['bal_acc']:.2f}%  "
           f"macro_F1={test_d['macro_f1']:.4f}")
-    print(f"Condition: acc={test_c['acc']:.2f}%  bal_acc={test_c['bal_acc']:.2f}%  "
+    print(f"condition: acc={test_c['acc']:.2f}%  bal_acc={test_c['bal_acc']:.2f}%  "
           f"macro_F1={test_c['macro_f1']:.4f}")
 
     wandb.log({
@@ -445,7 +445,7 @@ def main():
     })
 
     wandb.finish()
-    print("\nDone.")
+    print("\ndone.")
 
 
 if __name__ == "__main__":

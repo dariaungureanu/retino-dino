@@ -130,15 +130,15 @@ def save_pca_map(
     fig, axes = plt.subplots(1, 3, figsize=(15, 4))
 
     axes[0].imshow(raw_np)
-    axes[0].set_title(f"Input - {label}")
+    axes[0].set_title(f"input - {label}")
     axes[0].axis("off")
 
     axes[1].imshow(pca_resized)
-    axes[1].set_title(f"Patch PCA (RGB)  ({var_str})")
+    axes[1].set_title(f"patch PCA (RGB)  ({var_str})")
     axes[1].axis("off")
 
     axes[2].imshow(overlay)
-    axes[2].set_title(f"Overlay (a={alpha:.2f})")
+    axes[2].set_title(f"overlay (a={alpha:.2f})")
     axes[2].axis("off")
 
     fig.suptitle(
@@ -177,7 +177,7 @@ def main():
     )
     if args.max_images > 0:
         samples = samples[:args.max_images]
-        print(f"Using first {len(samples)} images")
+        print(f"using first {len(samples)} images")
 
     ds = OCTDataset(samples, img_size=args.img_size)
     dl = DataLoader(ds, batch_size=1, shuffle=False, num_workers=2)
@@ -188,7 +188,7 @@ def main():
     # Shape check
     with torch.no_grad():
         test_tokens = get_patch_tokens(model, ds[0][0].unsqueeze(0).to(device))
-        print(f"Patch tokens shape: {test_tokens.shape}  "
+        print(f"patch tokens shape: {test_tokens.shape}  "
               f"(expected [1, {grid_side ** 2}, *])")
 
     # Process
@@ -227,8 +227,8 @@ def main():
 
     # Summary
     avg_var = np.mean(all_variance, axis=0)
-    print(f"\nProcessed {len(records)} images")
-    print("Avg explained variance (3 PCA components): "
+    print(f"\nprocessed {len(records)} images")
+    print("avg explained variance (3 PCA components): "
           f"{avg_var[0]:.1%}, {avg_var[1]:.1%}, {avg_var[2]:.1%}  "
           f"(total: {avg_var.sum():.1%})")
 

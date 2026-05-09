@@ -142,17 +142,17 @@ def main():
     wandb.init(project="Licenta-Classifier-Unfrozen-Last-Block", config=args)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Device: {device}")
+    print(f"device: {device}")
 
     os.makedirs(args.save_dir, exist_ok=True)
 
-    print(f"Loading data from: {args.data_path}")
+    print(f"loading data from: {args.data_path}")
     train_df, val_df, test_df, disease_map, condition_map = get_data_splits(csv_path)
 
     train_df['label_disease_int'] = train_df['label_disease'].map(disease_map)
     train_df['label_condition_int'] = train_df['label_condition_raw'].map(lambda x: condition_map.get(x, -100))
 
-    print("Computing class weights...")
+    print("computing class weights...")
     weights_d = compute_class_weights(train_df, 'label_disease_int', len(disease_map))
     weights_c = compute_class_weights(train_df, 'label_condition_int', len(condition_map), ignore_index=-100)
     weights_d = weights_d.to(device)
@@ -178,10 +178,10 @@ def main():
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, num_workers=4, pin_memory=True)
     val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False, num_workers=4)
 
-    print(f"Loading SSL checkpoint from: {args.checkpoint}")
+    print(f"loading SSL checkpoint from: {args.checkpoint}")
     if not os.path.exists(args.checkpoint):
-        print(f"Warning: Checkpoint file not found at {args.checkpoint}")
-        print("Training from scratch with random weights.")
+        print(f"warning: Checkpoint file not found at {args.checkpoint}")
+        print("training from scratch with random weights.")
 
     model = OCTDLMultiTaskModel(
         checkpoint_path=args.checkpoint,
@@ -207,7 +207,7 @@ def main():
             model, val_loader, criterion_disease, criterion_condition, device, epoch
         )
 
-        print(f"\nEpoch {epoch}/{args.epochs} Results:")
+        print(f"\nepoch {epoch}/{args.epochs} Results:")
         print(f"[Train] Loss: {t_loss:.3f} | Disease F1: {t_f1_d:.3f}")
         print(f"[Val]   Loss: {v_loss:.3f} | Disease F1: {v_f1_d:.3f} (Best: {best_f1:.3f})")
 
@@ -222,7 +222,7 @@ def main():
             best_f1 = v_f1_d
             save_path = os.path.join(args.save_dir, "best_classifier_unfrozen.pth")
             torch.save(model.state_dict(), save_path)
-            print(f"Model saved with improved F1 score as: {save_path}")
+            print(f"model saved with improved F1 score as: {save_path}")
 
     wandb.finish()
 

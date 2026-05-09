@@ -34,7 +34,7 @@ if CLASSIFIER_DIR not in sys.path:
 
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-print(f"Running on: {DEVICE}")
+print(f"running on: {DEVICE}")
 
 
 def load_resources():
@@ -62,7 +62,7 @@ def load_resources():
         print(f" Warning: Can't find {SSL_CHECKPOINT_PATH}")
         init_checkpoint = MODEL_PATH
 
-    print("Initializing model structure...")
+    print("initializing model structure...")
     model = OCTDLMultiTaskModel(
         checkpoint_path=init_checkpoint,
         num_diseases=len(disease_map),
@@ -73,7 +73,7 @@ def load_resources():
     if os.path.exists(MODEL_PATH):
         state_dict = torch.load(MODEL_PATH, map_location=DEVICE)
         model.load_state_dict(state_dict)
-        print("Model weights loaded successfully.")
+        print("model weights loaded successfully.")
     else:
         raise FileNotFoundError(f"Model not found at: {MODEL_PATH}")
 
@@ -89,7 +89,7 @@ def plot_tsne(model, loader, idx_to_disease):
         print("t-SNE already exists. Skipping...")
         return
 
-    print("Extracting features for t-SNE...")
+    print("extracting features for t-SNE...")
     features = []
     labels = []
 
@@ -103,7 +103,7 @@ def plot_tsne(model, loader, idx_to_disease):
     features = np.concatenate(features, axis=0)
     labels = np.array(labels)
 
-    print("Computing t-SNE projection...")
+    print("computing t-SNE projection...")
     tsne = TSNE(n_components=2, random_state=42, perplexity=30)
     features_2d = tsne.fit_transform(features)
 
@@ -123,7 +123,7 @@ def plot_tsne(model, loader, idx_to_disease):
         )
 
     plt.title("t-SNE Visualization of Disease Latent Space", fontsize=16)
-    plt.legend(bbox_to_anchor=(1.02, 1), loc="upper left", title="Disease")
+    plt.legend(bbox_to_anchor=(1.02, 1), loc="upper left", title="disease")
     plt.tight_layout()
 
     plt.savefig(tsne_save_path, dpi=300)
@@ -223,7 +223,7 @@ def generate_cam_for_task_compare_pred_true(
       - CAM for predicted class
       - CAM for true class
     """
-    print(f"Generating GradCAM (pred vs true) for task: {task_name}...")
+    print(f"generating GradCAM (pred vs true) for task: {task_name}...")
 
     for p in model.backbone.parameters():
         p.requires_grad = True
@@ -234,7 +234,7 @@ def generate_cam_for_task_compare_pred_true(
 
     num_samples = len(indices)
     if num_samples == 0:
-        print("No indices given. Skipping.")
+        print("no indices given. Skipping.")
         return
 
     plt.figure(figsize=(14, 4 * num_samples))
@@ -248,7 +248,7 @@ def generate_cam_for_task_compare_pred_true(
         current_label = label_d if head_index == 0 else label_c
         label_val = int(current_label.item() if isinstance(current_label, torch.Tensor) else current_label)
         if label_val == -100:
-            print(f"Skipping sample {idx} (ignore label -100)")
+            print(f"skipping sample {idx} (ignore label -100)")
             continue
 
         with torch.no_grad():
@@ -289,7 +289,7 @@ def generate_cam_for_task_compare_pred_true(
     save_path = os.path.join(output_dir, save_name)
     plt.savefig(save_path, dpi=300)
     plt.close()
-    print(f"Saved: {save_path}")
+    print(f"saved: {save_path}")
 
 
 def plot_gradcam_on_errors(model, dataset, loader, idx_to_disease, idx_to_condition, task_head=0, topk=8):
@@ -304,7 +304,7 @@ def plot_gradcam_on_errors(model, dataset, loader, idx_to_disease, idx_to_condit
     save_name = f"gradcam_{task_name.lower()}_errors_top{topk}.png"
 
     if len(selected) == 0:
-        print(f"No errors for {task_name}. Nothing to plot.")
+        print(f"no errors for {task_name}. Nothing to plot.")
         return
 
     generate_cam_for_task_compare_pred_true(
@@ -349,7 +349,7 @@ def plot_gradcam_on_class_errors(
     save_name = f"gradcam_{task_name.lower()}_errors_true_{class_name}_top{topk}.png"
 
     if len(selected) == 0:
-        print(f"No errors found for TRUE={class_name} ({task_name}).")
+        print(f"no errors found for TRUE={class_name} ({task_name}).")
         return
 
     generate_cam_for_task_compare_pred_true(
@@ -376,4 +376,4 @@ if __name__ == "__main__":
                                 class_name="AMD", disease_map=disease_map, condition_map=condition_map,
                                 task_head=0, topk=8)
 
-    print(f"Done. Check folder: {output_dir}")
+    print(f"done. Check folder: {output_dir}")

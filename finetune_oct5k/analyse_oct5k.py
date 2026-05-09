@@ -60,8 +60,8 @@ def load_model(model_path, device):
 
     model.load_state_dict(ckpt["model_state_dict"])
     model.eval()
-    print(f"Loaded epoch {ckpt['epoch']}, val_f1={ckpt['val_f1_macro']:.4f}")
-    print(f"Active biomarkers: {[SHORT_NAMES[b] for b in active_biomarkers]}")
+    print(f"loaded epoch {ckpt['epoch']}, val_f1={ckpt['val_f1_macro']:.4f}")
+    print(f"active biomarkers: {[SHORT_NAMES[b] for b in active_biomarkers]}")
     return model, config, active_biomarkers
 
 
@@ -121,7 +121,7 @@ def plot_tsne(features, labels, active_biomarkers, out_path):
                     alpha=0.7, s=40, edgecolors="white", linewidths=0.3)
 
     plt.title("t-SNE - OCT5k Biomarker Feature Space", fontsize=14, fontweight="bold")
-    plt.legend(bbox_to_anchor=(1.02, 1), loc="upper left", fontsize=7, title="Biomarkers")
+    plt.legend(bbox_to_anchor=(1.02, 1), loc="upper left", fontsize=7, title="biomarkers")
     plt.tight_layout()
     plt.savefig(out_path, dpi=200, bbox_inches="tight")
     plt.close()
@@ -213,7 +213,7 @@ def generate_gradcam_with_bbox(
     GradCAM for one biomarker with expert bounding box overlay + IoU score.
     """
     if len(sample_indices) == 0:
-        print(f"No samples for: {title}")
+        print(f"no samples for: {title}")
         return []
 
     for p in model.backbone.parameters():
@@ -350,7 +350,7 @@ def main():
                              num_workers=args.num_workers, pin_memory=True)
 
     bbox_df = pd.read_csv(args.bbox_csv)
-    print(f"Loaded {len(bbox_df)} bounding boxes")
+    print(f"loaded {len(bbox_df)} bounding boxes")
 
     # t-SNE
     if not args.skip_tsne:
@@ -408,7 +408,7 @@ def main():
             json.dump(all_iou_results, f, indent=2)
         print(f"{iou_path}")
 
-    print(f"\nAll outputs: {args.out_dir}")
+    print(f"\nall outputs: {args.out_dir}")
 
 
 if __name__ == "__main__":

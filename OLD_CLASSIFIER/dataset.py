@@ -47,7 +47,7 @@ def get_data_splits(csv_path, test_size=0.2, val_size=0.1):
     Split dataset based on patient IDs to prevent data leakage.
     Returns train, validation, and test dataframes along with label mappings.
     """
-    print(f"Loading metadata from: {csv_path}")
+    print(f"loading metadata from: {csv_path}")
     df = pd.read_csv(csv_path)
 
     unique_diseases = sorted(df['label_disease'].astype(str).unique())
@@ -56,8 +56,8 @@ def get_data_splits(csv_path, test_size=0.2, val_size=0.1):
     valid_conditions = sorted(df[df['label_condition_raw'] != 'IGNORE']['label_condition_raw'].unique())
     condition_map = {name: i for i, name in enumerate(valid_conditions)}
 
-    print(f"Classes (Disease): {disease_map}")
-    print(f"Classes (Condition): {condition_map}")
+    print(f"classes (Disease): {disease_map}")
+    print(f"classes (Condition): {condition_map}")
 
     patients = df[['patient_id', 'label_disease']].drop_duplicates()
 
@@ -81,9 +81,9 @@ def get_data_splits(csv_path, test_size=0.2, val_size=0.1):
     val_df = df[df['patient_id'].isin(val_pat['patient_id'])]
     test_df = df[df['patient_id'].isin(test_pat['patient_id'])]
 
-    print("Split Complete:")
-    print(f"Train: {len(train_df)} images ({len(train_pat)} patients)")
-    print(f"Val:   {len(val_df)} images ({len(val_pat)} patients)")
-    print(f"Test:  {len(test_df)} images ({len(test_pat)} patients)")
+    print("split Complete:")
+    print(f"train: {len(train_df)} images ({len(train_pat)} patients)")
+    print(f"val:   {len(val_df)} images ({len(val_pat)} patients)")
+    print(f"test:  {len(test_df)} images ({len(test_pat)} patients)")
 
     return train_df, val_df, test_df, disease_map, condition_map

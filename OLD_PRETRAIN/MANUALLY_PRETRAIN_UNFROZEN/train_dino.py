@@ -148,7 +148,7 @@ def main():
         persistent_workers=True
     )
 
-    print("Loading DINOv2-BASE (ViT-B/14)...")
+    print("loading DINOv2-BASE (ViT-B/14)...")
 
     backbone_student = torch.hub.load('facebookresearch/dinov2', 'dinov2_vitb14')
     backbone_teacher = torch.hub.load('facebookresearch/dinov2', 'dinov2_vitb14')
@@ -178,7 +178,7 @@ def main():
     momentum_schedule = cosine_scheduler(0.996, 1.0, args.epochs, iters_per_epoch)
 
     best_loss = float('inf')
-    print("Starting DINO-Style Pre-training...")
+    print("starting DINO-Style Pre-training...")
     iteration = 0
     for epoch in range(args.epochs):
         student.train()
@@ -243,14 +243,14 @@ def main():
             },
             os.path.join(args.save_dir, "dinov2_oct_opt_latest.pth")
         )
-        print(f"Saved Epoch {epoch + 1}. Avg Loss: {total_loss / len(dataloader):.4f}")
+        print(f"saved Epoch {epoch + 1}. Avg Loss: {total_loss / len(dataloader):.4f}")
         if avg_loss < best_loss:
             best_loss = avg_loss
             torch.save(
                 student.state_dict(),
                 os.path.join(args.save_dir, "dinov2_oct_opt_BEST.pth")
             )
-            print(f"New: {best_loss:.4f}! Checkpoint BEST saved.")
+            print(f"new: {best_loss:.4f}! Checkpoint BEST saved.")
 
     wandb.finish()
 

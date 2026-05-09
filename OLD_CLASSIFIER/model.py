@@ -4,11 +4,11 @@ import os
 
 
 def load_custom_backbone(checkpoint_path):
-    print("Loading backbone architecture from Torch Hub...")
+    print("loading backbone architecture from Torch Hub...")
 
     backbone = torch.hub.load('facebookresearch/dinov2', 'dinov2_vitl14')
 
-    print(f"Loading custom weights from: {checkpoint_path}")
+    print(f"loading custom weights from: {checkpoint_path}")
     if not os.path.exists(checkpoint_path):
         raise FileNotFoundError(f"Error: Checkpoint not found at {checkpoint_path}")
 
@@ -23,7 +23,7 @@ def load_custom_backbone(checkpoint_path):
         clean_state_dict[new_key] = value
 
     msg = backbone.load_state_dict(clean_state_dict, strict=False)
-    print(f"Backbone weights loaded successfully (Missing keys for head layers: {len(msg.missing_keys)})")
+    print(f"backbone weights loaded successfully (Missing keys for head layers: {len(msg.missing_keys)})")
 
     return backbone
 
@@ -42,11 +42,11 @@ class OCTDLMultiTaskModel(nn.Module):
                     param.requires_grad = False
 
             if unfreeze_last_block:
-                print("Backbone is mostly frozen, BUT the last block (blocks.23) is UNFROZEN.")
+                print("backbone is mostly frozen, BUT the last block (blocks.23) is UNFROZEN.")
             else:
-                print("Backbone is fully frozen. Only classification heads will be trained.")
+                print("backbone is fully frozen. Only classification heads will be trained.")
         else:
-            print("Backbone is unfrozen. Full fine-tuning enabled.")
+            print("backbone is unfrozen. Full fine-tuning enabled.")
 
         self.feature_dim = 1024
 

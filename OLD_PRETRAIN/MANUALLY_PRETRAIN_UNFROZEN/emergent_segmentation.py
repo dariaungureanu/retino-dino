@@ -22,12 +22,12 @@ def main(image_path=None, output_name=None):
         output_name = "thesis_dinov2_pca.png"
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
+    print(f"using device: {device}")
 
-    print("Loading base DINOv2 architecture from Meta...")
+    print("loading base DINOv2 architecture from Meta...")
     model = torch.hub.load('facebookresearch/dinov2', 'dinov2_vitb14')
 
-    print(f"Injecting domain-adapted weights from: {os.path.basename(CHECKPOINT_PATH)}")
+    print(f"injecting domain-adapted weights from: {os.path.basename(CHECKPOINT_PATH)}")
     checkpoint = torch.load(CHECKPOINT_PATH, map_location=device)
 
     teacher_state_dict = checkpoint["teacher"]
@@ -57,7 +57,7 @@ def main(image_path=None, output_name=None):
 
     patch_tokens = outputs['x_norm_patchtokens'][0].cpu().numpy()
 
-    print("Running PCA to reduce 768 dimensions to RGB...")
+    print("running PCA to reduce 768 dimensions to RGB...")
     pca = PCA(n_components=3)
     pca_features = pca.fit_transform(patch_tokens)
     for i in range(3):
@@ -69,7 +69,7 @@ def main(image_path=None, output_name=None):
 
     fig, axes = plt.subplots(1, 3, figsize=(18, 6))
     axes[0].imshow(img_original)
-    axes[0].set_title("Original OCT", fontsize=14)
+    axes[0].set_title("original OCT", fontsize=14)
     axes[0].axis("off")
     axes[1].imshow(pca_resized)
     axes[1].set_title("DINOv2 PCA Semantic Features", fontsize=14)
@@ -77,12 +77,12 @@ def main(image_path=None, output_name=None):
 
     overlay = cv2.addWeighted(np.array(img_original), 0.4, np.uint8(255 * pca_resized), 0.6, 0)
     axes[2].imshow(overlay)
-    axes[2].set_title("Pathology Overlay", fontsize=14)
+    axes[2].set_title("pathology Overlay", fontsize=14)
     axes[2].axis("off")
 
     plt.tight_layout()
     plt.savefig(output_name, dpi=300, bbox_inches='tight')
-    print(f"Success! Saved as '{output_name}'.")
+    print(f"saved {output_name}")
     plt.show()
 
 if __name__ == '__main__':

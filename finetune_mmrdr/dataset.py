@@ -71,7 +71,7 @@ def load_mmrdr_splits(csv_path, root_dir, val_size=0.1, random_state=42):
     Validation is carved from the training set (stratified on grade).
     """
     df = pd.read_csv(csv_path)
-    print(f"Loaded {len(df)} rows from {csv_path}")
+    print(f"loaded {len(df)} rows from {csv_path}")
 
     # Filename prefix encodes the predefined split.
     df["split"] = df["image"].apply(lambda x: "train" if os.path.basename(x).startswith("tr") else "test")
@@ -79,7 +79,7 @@ def load_mmrdr_splits(csv_path, root_dir, val_size=0.1, random_state=42):
     train_full = df[df["split"] == "train"].copy()
     test_df = df[df["split"] == "test"].copy()
 
-    print(f"Predefined split: {len(train_full)} train, {len(test_df)} test")
+    print(f"predefined split: {len(train_full)} train, {len(test_df)} test")
 
     for split_name, split_df in [("Train", train_full), ("Test", test_df)]:
         dist = split_df["grade"].value_counts().sort_index()
@@ -93,7 +93,7 @@ def load_mmrdr_splits(csv_path, root_dir, val_size=0.1, random_state=42):
         stratify=train_full["grade"],
     )
 
-    print(f"After val split: {len(train_df)} train, {len(val_df)} val, {len(test_df)} test")
+    print(f"after val split: {len(train_df)} train, {len(val_df)} val, {len(test_df)} test")
 
     for name, split_df in [("train", train_df), ("val", val_df), ("test", test_df)]:
         missing = sum(1 for _, r in split_df.iterrows()

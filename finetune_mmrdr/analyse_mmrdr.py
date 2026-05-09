@@ -34,7 +34,7 @@ from model import MMRDRModel, load_backbone
 
 
 def load_model(model_path, device):
-    print(f"Loading: {model_path}")
+    print(f"loading: {model_path}")
     ckpt = torch.load(model_path, map_location=device)
     config = ckpt["config"]
     num_classes = ckpt["num_classes"]
@@ -156,7 +156,7 @@ def generate_gradcam_grid(model, dataset, sample_indices, save_path,
                           device, title="GradCAM"):
     """GradCAM grid: each row is Original | CAM for Predicted | CAM for True."""
     if len(sample_indices) == 0:
-        print(f"No samples for: {title}")
+        print(f"no samples for: {title}")
         return
 
     for p in model.backbone.parameters():
@@ -272,7 +272,7 @@ def main():
             title="GradCAM - Top Confident Errors",
         )
 
-        # NCI vs CI confusion: where the model looks when it confuses these classes.
+        # nci/ci confusion samples
         nci_as_ci = select_samples(
             y_true, y_pred, y_conf, idx,
             class_idx=1, correct=False, topk=args.topk,
@@ -295,7 +295,7 @@ def main():
             title="GradCAM - CI-DME Misclassified",
         )
 
-    print(f"\nAll outputs: {args.out_dir}")
+    print(f"\nall outputs: {args.out_dir}")
 
 
 if __name__ == "__main__":

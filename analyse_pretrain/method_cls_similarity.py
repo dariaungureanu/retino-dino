@@ -131,7 +131,7 @@ def save_similarity_map(
     fig, axes = plt.subplots(1, 3, figsize=(15, 4))
 
     axes[0].imshow(raw_np)
-    axes[0].set_title(f"Input - {label}")
+    axes[0].set_title(f"input - {label}")
     axes[0].axis("off")
 
     axes[1].imshow(heat_rgb)
@@ -139,7 +139,7 @@ def save_similarity_map(
     axes[1].axis("off")
 
     axes[2].imshow(overlay)
-    axes[2].set_title(f"Overlay (α={alpha:.2f})")
+    axes[2].set_title(f"overlay (α={alpha:.2f})")
     axes[2].axis("off")
 
     fig.suptitle(
@@ -177,7 +177,7 @@ def main():
     )
     if args.max_images > 0:
         samples = samples[:args.max_images]
-        print(f"Using first {len(samples)} images")
+        print(f"using first {len(samples)} images")
 
     ds = OCTDataset(samples, img_size=args.img_size)
     dl = DataLoader(ds, batch_size=1, shuffle=False, num_workers=2)
@@ -219,15 +219,7 @@ def main():
     if all_stats:
         avg_mean = np.mean([s["mean"] for s in all_stats])
         avg_std = np.mean([s["std"] for s in all_stats])
-        print(f"\nProcessed {len(records)} images")
-        print(f"Avg cosine similarity: {avg_mean:.4f} ± {avg_std:.4f}")
-        print("Interpretation:")
-        if avg_std > 0.10:
-            print("High variance -> CLS is selective (good for classification)")
-        elif avg_std > 0.05:
-            print("Moderate variance -> CLS has some spatial preference")
-        else:
-            print("Low variance -> CLS attends broadly (may lack focus)")
+        print(f"\n{len(records)} images, avg cosine = {avg_mean:.4f} ± {avg_std:.4f}")
 
     checkpoint_label = args.checkpoint or "ImageNet baseline (no checkpoint)"
     result = {
