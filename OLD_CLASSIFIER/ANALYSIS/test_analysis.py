@@ -83,7 +83,6 @@ def main():
     model.to(args.device)
     model.eval()
 
-    # 4. Inference Loop
     all_preds_d, all_labels_d = [], []
     all_preds_c, all_labels_c = [], []
 

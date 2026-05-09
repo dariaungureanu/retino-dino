@@ -176,16 +176,16 @@ def evaluate_test(model, loader, criterion, device, out_dir):
     preds = (probs >= THRESHOLD).astype(int)
     labels_np = cat_labels.cpu().numpy()
 
-    print("  BIOMARKER DETECTION REPORT")
+    print("biomarker detection report")
     for i, bm in enumerate(BIOMARKERS):
-        print(f"\n  {bm}:")
-        print(f"    F1={metrics[f'f1_{bm}']:.4f}  "
+        print(f"\n{bm}:")
+        print(f"F1={metrics[f'f1_{bm}']:.4f}  "
               f"AUC={metrics[f'auc_{bm}']:.4f}  "
               f"Acc={metrics[f'acc_{bm}']:.1f}%")
 
-    print(f"\n  Macro F1:     {metrics['f1_macro']:.4f}")
-    print(f"  Macro AUC:    {metrics['auc_macro']:.4f}")
-    print(f"  Exact Match:  {metrics['exact_match']:.1f}%")
+    print(f"\nMacro F1:     {metrics['f1_macro']:.4f}")
+    print(f"Macro AUC:    {metrics['auc_macro']:.4f}")
+    print(f"Exact Match:  {metrics['exact_match']:.1f}%")
 
     fig, axes = plt.subplots(1, NUM_LABELS, figsize=(5 * NUM_LABELS, 4))
     for i, bm in enumerate(BIOMARKERS):
@@ -287,7 +287,7 @@ def main():
     patience_counter = 0
     best_epoch = 0
 
-    print(f"  TRAINING - {args.epochs} epochs, {NUM_LABELS} biomarkers")
+    print(f"TRAINING - {args.epochs} epochs, {NUM_LABELS} biomarkers")
 
     for epoch in range(1, args.epochs + 1):
         t0 = time.time()
@@ -304,9 +304,9 @@ def main():
         lr = optimizer.param_groups[0]["lr"]
 
         print(f"Epoch {epoch:02d}/{args.epochs} ({elapsed:.0f}s) lr={lr:.2e}")
-        print(f"  Train  loss={t_loss:.4f}  F1_macro={t_met['f1_macro']:.4f}  "
+        print(f"Train  loss={t_loss:.4f}  F1_macro={t_met['f1_macro']:.4f}  "
               f"AUC_macro={t_met['auc_macro']:.4f}")
-        print(f"  Val    loss={v_loss:.4f}  F1_macro={v_met['f1_macro']:.4f}  "
+        print(f"Val    loss={v_loss:.4f}  F1_macro={v_met['f1_macro']:.4f}  "
               f"AUC_macro={v_met['auc_macro']:.4f}  "
               f"(best_f1={best_val_f1:.4f})")
 
@@ -346,20 +346,20 @@ def main():
                 print(f"\n[EARLY STOP] Best: epoch {best_epoch}, F1={best_val_f1:.4f}")
                 break
 
-    print(f"  FINAL TEST (best checkpoint: epoch {best_epoch})")
+    print(f"FINAL TEST (best checkpoint: epoch {best_epoch})")
     best_ckpt = torch.load(os.path.join(args.save_dir, "best_model.pth"), map_location=device)
     model.load_state_dict(best_ckpt["model_state_dict"])
 
     test_met = evaluate_test(model, test_loader, criterion, device, args.save_dir)
 
-    print("  FINAL RESULTS")
+    print("final results")
     for bm in BIOMARKERS:
-        print(f"  {bm:>8}: F1={test_met[f'f1_{bm}']:.4f}  "
+        print(f"{bm:>8}: F1={test_met[f'f1_{bm}']:.4f}  "
               f"AUC={test_met[f'auc_{bm}']:.4f}  "
               f"Acc={test_met[f'acc_{bm}']:.1f}%")
-    print(f"  {'Macro':>8}: F1={test_met['f1_macro']:.4f}  "
+    print(f"{'Macro':>8}: F1={test_met['f1_macro']:.4f}  "
           f"AUC={test_met['auc_macro']:.4f}")
-    print(f"  Exact Match: {test_met['exact_match']:.1f}%")
+    print(f"Exact Match: {test_met['exact_match']:.1f}%")
 
     results = {
         "checkpoint": args.checkpoint or "ImageNet baseline",

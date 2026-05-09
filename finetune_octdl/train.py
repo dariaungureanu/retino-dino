@@ -173,14 +173,14 @@ def evaluate_test(model, loader, criterion_d, criterion_c, device,
     labels_c = cat_labels_c.cpu().numpy()
     cond_mask = labels_c != IGNORE_INDEX
 
-    print("  DISEASE Classification Report")
+    print("DISEASE Classification Report")
     print(classification_report(
         labels_d, preds_d,
         target_names=[inv_disease[i] for i in range(len(disease_map))],
         zero_division=0,
     ))
 
-    print("  CONDITION Classification Report")
+    print("CONDITION Classification Report")
     if cond_mask.sum() > 0:
         print(classification_report(
             labels_c[cond_mask], preds_c[cond_mask],
@@ -339,7 +339,7 @@ def main():
     patience_counter = 0
     best_epoch = 0
 
-    print(f"  TRAINING START - {args.epochs} epochs")
+    print(f"training start - {args.epochs} epochs")
 
     for epoch in range(1, args.epochs + 1):
         t0 = time.time()
@@ -365,9 +365,9 @@ def main():
 
         # Print summary
         print(f"\nEpoch {epoch:02d}/{args.epochs} ({elapsed:.0f}s)  lr={current_lr:.2e}")
-        print(f"  Train  loss={t_loss:.4f}  disease_F1={t_met_d['macro_f1']:.4f}  "
+        print(f"Train  loss={t_loss:.4f}  disease_F1={t_met_d['macro_f1']:.4f}  "
               f"cond_F1={t_met_c['macro_f1']:.4f}")
-        print(f"  Val    loss={v_loss:.4f}  disease_F1={v_met_d['macro_f1']:.4f}  "
+        print(f"Val    loss={v_loss:.4f}  disease_F1={v_met_d['macro_f1']:.4f}  "
               f"cond_F1={v_met_c['macro_f1']:.4f}  "
               f"(best={best_val_f1:.4f})")
 
@@ -408,7 +408,7 @@ def main():
                 "disease_map": disease_map,
                 "condition_map": condition_map,
             }, save_path)
-            print(f"  New best! Saved -> {save_path}")
+            print(f"New best! Saved -> {save_path}")
         else:
             patience_counter += 1
             if patience_counter >= args.patience:
@@ -417,7 +417,7 @@ def main():
                 break
 
     # Test evaluation on best checkpoint
-    print(f"  FINAL TEST EVALUATION (best checkpoint: epoch {best_epoch})")
+    print(f"final test (best checkpoint: epoch {best_epoch})")
     best_ckpt = torch.load(
         os.path.join(args.save_dir, "best_model.pth"),
         map_location=device,
@@ -429,10 +429,10 @@ def main():
         disease_map, condition_map,
     )
 
-    print("  FINAL RESULTS")
-    print(f"  Disease:   acc={test_d['acc']:.2f}%  bal_acc={test_d['bal_acc']:.2f}%  "
+    print("final results")
+    print(f"Disease:   acc={test_d['acc']:.2f}%  bal_acc={test_d['bal_acc']:.2f}%  "
           f"macro_F1={test_d['macro_f1']:.4f}")
-    print(f"  Condition: acc={test_c['acc']:.2f}%  bal_acc={test_c['bal_acc']:.2f}%  "
+    print(f"Condition: acc={test_c['acc']:.2f}%  bal_acc={test_c['bal_acc']:.2f}%  "
           f"macro_F1={test_c['macro_f1']:.4f}")
 
     wandb.log({

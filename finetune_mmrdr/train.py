@@ -282,9 +282,9 @@ def main():
         lr = optimizer.param_groups[0]["lr"]
 
         print(f"Epoch {epoch:02d}/{args.epochs} ({elapsed:.0f}s) lr={lr:.2e}")
-        print(f"  Train  loss={t_loss:.4f}  F1={t_met['macro_f1']:.4f}  "
+        print(f"Train  loss={t_loss:.4f}  F1={t_met['macro_f1']:.4f}  "
               f"AUC={t_met['auc_roc']:.4f}  Kappa={t_met['kappa']:.4f}")
-        print(f"  Val    loss={v_loss:.4f}  F1={v_met['macro_f1']:.4f}  "
+        print(f"Val    loss={v_loss:.4f}  F1={v_met['macro_f1']:.4f}  "
               f"AUC={v_met['auc_roc']:.4f}  Kappa={v_met['kappa']:.4f}  "
               f"(best_f1={best_val_f1:.4f})")
 
@@ -325,12 +325,12 @@ def main():
 
     test_met = evaluate_test(model, test_loader, criterion, device, num_classes, args.save_dir)
 
-    print("  FINAL RESULTS")
-    print(f"  Accuracy:     {test_met['acc']:.2f}%")
-    print(f"  Balanced Acc: {test_met['bal_acc']:.2f}%")
-    print(f"  Macro-F1:     {test_met['macro_f1']:.4f}")
-    print(f"  AUC-ROC:      {test_met['auc_roc']:.4f}")
-    print(f"  Kappa:        {test_met['kappa']:.4f}")
+    print("final results")
+    print(f"Accuracy:     {test_met['acc']:.2f}%")
+    print(f"Balanced Acc: {test_met['bal_acc']:.2f}%")
+    print(f"Macro-F1:     {test_met['macro_f1']:.4f}")
+    print(f"AUC-ROC:      {test_met['auc_roc']:.4f}")
+    print(f"Kappa:        {test_met['kappa']:.4f}")
 
     results = {
         "checkpoint": args.checkpoint or "ImageNet baseline",

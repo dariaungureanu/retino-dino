@@ -228,11 +228,11 @@ def main():
         print("No valid condition labels in test set - skipping condition matrix")
 
     # Classification reports
-    print("  DISEASE Report")
+    print("DISEASE Report")
     print(classification_report(labels_d, preds_d, target_names=disease_names, zero_division=0))
 
     if cond_mask.sum() > 0:
-        print("  CONDITION Report")
+        print("CONDITION Report")
         print(classification_report(
             valid_labels_c, valid_preds_c,
             target_names=condition_names, zero_division=0,

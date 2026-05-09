@@ -160,18 +160,18 @@ def evaluate_test(model, loader, criterion, device, biomarkers, out_dir):
     preds = (probs >= THRESHOLD).astype(int)
     labels_np = cat_labels.cpu().numpy()
 
-    print("  BIOMARKER DETECTION REPORT")
+    print("biomarker detection report")
     for i, bm in enumerate(biomarkers):
         n_pos = int(labels_np[:, i].sum())
         n_total = len(labels_np)
-        print(f"\n  {SHORT_NAMES[bm]} ({bm}) [support: {n_pos}/{n_total}]:")
-        print(f"    F1={metrics[f'f1_{bm}']:.4f}  "
+        print(f"\n{SHORT_NAMES[bm]} ({bm}) [support: {n_pos}/{n_total}]:")
+        print(f"F1={metrics[f'f1_{bm}']:.4f}  "
               f"AUC={metrics[f'auc_{bm}']:.4f}  "
               f"Acc={metrics[f'acc_{bm}']:.1f}%")
 
-    print(f"\n  Macro F1:     {metrics['f1_macro']:.4f}")
-    print(f"  Macro AUC:    {metrics['auc_macro']:.4f}")
-    print(f"  Exact Match:  {metrics['exact_match']:.1f}%")
+    print(f"\nMacro F1:     {metrics['f1_macro']:.4f}")
+    print(f"Macro AUC:    {metrics['auc_macro']:.4f}")
+    print(f"Exact Match:  {metrics['exact_match']:.1f}%")
 
     # Confusion matrices
     n_bm = len(biomarkers)
@@ -284,7 +284,7 @@ def main():
     patience_counter = 0
     best_epoch = 0
 
-    print(f"  TRAINING - {args.epochs} epochs, {num_labels} biomarkers")
+    print(f"TRAINING - {args.epochs} epochs, {num_labels} biomarkers")
 
     for epoch in range(1, args.epochs + 1):
         t0 = time.time()
@@ -301,9 +301,9 @@ def main():
         lr = optimizer.param_groups[0]["lr"]
 
         print(f"Epoch {epoch:02d}/{args.epochs} ({elapsed:.0f}s) lr={lr:.2e}")
-        print(f"  Train  loss={t_loss:.4f}  F1_macro={t_met['f1_macro']:.4f}  "
+        print(f"Train  loss={t_loss:.4f}  F1_macro={t_met['f1_macro']:.4f}  "
               f"AUC_macro={t_met['auc_macro']:.4f}")
-        print(f"  Val    loss={v_loss:.4f}  F1_macro={v_met['f1_macro']:.4f}  "
+        print(f"Val    loss={v_loss:.4f}  F1_macro={v_met['f1_macro']:.4f}  "
               f"AUC_macro={v_met['auc_macro']:.4f}  "
               f"(best_f1={best_val_f1:.4f})")
 
@@ -335,14 +335,14 @@ def main():
                 "num_labels": num_labels,
                 "biomarkers": active_biomarkers,
             }, save_path)
-            print(f"  New best! Saved -> {save_path}")
+            print(f"New best! Saved -> {save_path}")
         else:
             patience_counter += 1
             if patience_counter >= args.patience:
                 print(f"\n[EARLY STOP] Best: epoch {best_epoch}, F1={best_val_f1:.4f}")
                 break
 
-    print(f"  FINAL TEST (best checkpoint: epoch {best_epoch})")
+    print(f"FINAL TEST (best checkpoint: epoch {best_epoch})")
     best_ckpt = torch.load(os.path.join(args.save_dir, "best_model.pth"), map_location=device)
     model.load_state_dict(best_ckpt["model_state_dict"])
 

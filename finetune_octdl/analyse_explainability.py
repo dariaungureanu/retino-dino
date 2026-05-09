@@ -53,7 +53,6 @@ from model import OCTDLMultiTaskModel, load_backbone
 
 
 def load_model_from_checkpoint(model_path, device):
-    """Load fine-tuned model from checkpoint. Returns (model, ckpt_dict)."""
     print(f"Loading checkpoint: {model_path}")
     ckpt = torch.load(model_path, map_location=device)
 
@@ -153,7 +152,6 @@ def plot_tsne(features, labels, label_map, title, save_path,
     print(f"{save_path}")
 
 class TaskHeadWrapper(nn.Module):
-    """Wraps the multi-task model to output only one head's logits."""
     def __init__(self, model, head_index):
         super().__init__()
         self.model = model
@@ -351,7 +349,7 @@ def main():
     print(f"Test set: {len(test_ds)} images")
 
     if not args.skip_tsne:
-        print("  T-SNE VISUALIZATION")
+        print("T-SNE VISUALIZATION")
         features, labels_d, labels_c = extract_features_and_labels(
             model, test_loader, device,
         )
@@ -373,7 +371,7 @@ def main():
         )
 
     if not args.skip_gradcam:
-        print("  GRADCAM ERROR ANALYSIS")
+        print("gradcam error analysis")
         # Top disease errors
         y_true_d, y_pred_d, y_conf_d, idx_d = collect_predictions(
             model, test_loader, device, head_index=0,
@@ -426,7 +424,7 @@ def main():
             else:
                 print(f"Class '{cls_name}' not found in disease or condition maps")
 
-    print(f"\n[DONE] All outputs saved to: {args.out_dir}")
+    print(f"\nAll outputs saved to: {args.out_dir}")
 
 
 if __name__ == "__main__":

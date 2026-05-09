@@ -146,7 +146,7 @@ def main():
         if n_pos < args.min_samples:
             status = f" <- WARNING: only {n_pos} images, consider dropping"
             drop_biomarkers.append(bm)
-        print(f"  {SHORT_NAMES[bm]:>5} ({bm}): {n_pos} images ({pct:.1f}%){status}")
+        print(f"{SHORT_NAMES[bm]:>5} ({bm}): {n_pos} images ({pct:.1f}%){status}")
 
     if drop_biomarkers:
         print(f"\nBiomarkers with <{args.min_samples} images: {drop_biomarkers}")
@@ -156,7 +156,7 @@ def main():
     print("\nImages per patient (top 10):")
     pat_counts = df.groupby("patient_id").size().sort_values(ascending=False)
     for pat, n in pat_counts.head(10).items():
-        print(f"  {pat}: {n} images")
+        print(f"{pat}: {n} images")
 
     # Save
     df.to_csv(args.out_csv, index=False)

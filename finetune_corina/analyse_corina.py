@@ -108,7 +108,6 @@ def plot_tsne(features, labels, out_path, perplexity=30):
 
 
 class BiomarkerWrapper(nn.Module):
-    """Wraps model to output logit for a single biomarker index."""
     def __init__(self, model, biomarker_idx):
         super().__init__()
         self.model = model
@@ -304,7 +303,7 @@ def main():
                 title=f"GradCAM - {bm} Detection Errors",
             )
 
-    print(f"\n[DONE] All outputs: {args.out_dir}")
+    print(f"\nAll outputs: {args.out_dir}")
 
 
 if __name__ == "__main__":

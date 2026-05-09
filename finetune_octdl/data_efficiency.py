@@ -228,11 +228,11 @@ def train_and_evaluate(
             patience_counter += 1
             marker = ""
 
-        print(f"  Ep {epoch:02d}  train_f1={t_d['macro_f1']:.3f}  "
+        print(f"Ep {epoch:02d}  train_f1={t_d['macro_f1']:.3f}  "
               f"val_f1={v_d['macro_f1']:.3f}  best={best_val_f1:.3f} {marker}")
 
         if patience_counter >= PATIENCE:
-            print(f"  Early stop at epoch {epoch}")
+            print(f"Early stop at epoch {epoch}")
             break
 
     # Evaluate on test with best checkpoint
@@ -244,7 +244,7 @@ def train_and_evaluate(
         lambda_cond=LAMBDA_COND,
     )
 
-    print(f"\n  TEST: disease_acc={test_d['acc']:.2f}%  disease_f1={test_d['macro_f1']:.4f}  "
+    print(f"\nTEST: disease_acc={test_d['acc']:.2f}%  disease_f1={test_d['macro_f1']:.4f}  "
           f"cond_f1={test_c['macro_f1']:.4f}")
 
     return {
@@ -410,10 +410,10 @@ def main():
 
     # Summary table
     print(f"\n{'='*70}")
-    print(f"  DATA EFFICIENCY SUMMARY - {checkpoint_label}")
-    print(f"  {'Fraction':<10} {'N_train':<10} {'Disease F1':<12} {'Disease Acc':<12} {'Cond F1':<12}")
+    print(f"data efficiency summary - {checkpoint_label}")
+    print(f"{'Fraction':<10} {'N_train':<10} {'Disease F1':<12} {'Disease Acc':<12} {'Cond F1':<12}")
     for r in all_results:
-        print(f"  {r['fraction']:<10.0%} {r['train_images']:<10} "
+        print(f"{r['fraction']:<10.0%} {r['train_images']:<10} "
               f"{r['disease_f1']:<12.4f} {r['disease_acc']:<12.2f} {r['condition_f1']:<12.4f}")
 
 

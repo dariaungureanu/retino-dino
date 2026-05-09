@@ -75,7 +75,6 @@ def load_all_samples(
     label_col: str,
     path_col: str,
 ) -> Tuple[List[str], List[str]]:
-    """Load every image listed in the CSV (UMAP uses all samples)."""
     import pandas as pd
 
     df = pd.read_csv(csv_path)

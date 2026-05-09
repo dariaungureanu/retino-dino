@@ -114,7 +114,6 @@ def denormalize(img_tensor):
 
 @torch.no_grad()
 def collect_predictions(model, loader, device):
-    """Returns y_true, y_pred, y_conf, sample_indices."""
     softmax = nn.Softmax(dim=1)
     y_true, y_pred, y_conf, indices = [], [], [], []
     idx = 0
@@ -296,7 +295,7 @@ def main():
             title="GradCAM - CI-DME Misclassified",
         )
 
-    print(f"\n[DONE] All outputs: {args.out_dir}")
+    print(f"\nAll outputs: {args.out_dir}")
 
 
 if __name__ == "__main__":

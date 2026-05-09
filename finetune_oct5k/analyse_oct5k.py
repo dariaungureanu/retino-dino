@@ -296,7 +296,7 @@ def generate_gradcam_with_bbox(
 
     if all_ious:
         mean_iou = np.mean(all_ious)
-        print(f"  {SHORT_NAMES[biomarker_name]} IoU: mean={mean_iou:.3f}, "
+        print(f"{SHORT_NAMES[biomarker_name]} IoU: mean={mean_iou:.3f}, "
               f"per-image={[f'{x:.2f}' for x in all_ious]}")
 
     return all_ious
@@ -392,15 +392,15 @@ def main():
             if ious_errors:
                 all_iou_results[f"{SHORT_NAMES[bm]}_errors"] = np.mean(ious_errors)
 
-        print("  GRADCAM-BBOX IoU SUMMARY")
+        print("gradcam/bbox iou summary")
         for key, val in sorted(all_iou_results.items()):
-            print(f"  {key:>20}: IoU = {val:.3f}")
+            print(f"{key:>20}: IoU = {val:.3f}")
         if all_iou_results:
             overall_mean = np.mean(list(all_iou_results.values()))
             correct_only = [v for k, v in all_iou_results.items() if "correct" in k]
             if correct_only:
-                print(f"  {'Mean (correct)':>20}: IoU = {np.mean(correct_only):.3f}")
-            print(f"  {'Overall Mean':>20}: IoU = {overall_mean:.3f}")
+                print(f"{'Mean (correct)':>20}: IoU = {np.mean(correct_only):.3f}")
+            print(f"{'Overall Mean':>20}: IoU = {overall_mean:.3f}")
 
         iou_path = os.path.join(args.out_dir, "iou_results.json")
         import json
@@ -408,7 +408,7 @@ def main():
             json.dump(all_iou_results, f, indent=2)
         print(f"{iou_path}")
 
-    print(f"\n[DONE] All outputs: {args.out_dir}")
+    print(f"\nAll outputs: {args.out_dir}")
 
 
 if __name__ == "__main__":

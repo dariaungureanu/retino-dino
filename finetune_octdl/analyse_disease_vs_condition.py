@@ -259,7 +259,7 @@ def main():
         plt.close(fig)
         print(f"{save_path}")
 
-    print(f"\n[DONE] All outputs: {args.out_dir}")
+    print(f"\nAll outputs: {args.out_dir}")
 
 
 if __name__ == "__main__":

@@ -14,7 +14,7 @@ import torch.nn.functional as F
 
 def load_backbone(arch, checkpoint, device):
     """Same backbone loading as OCTDL/MMRDR pipelines."""
-    print("  MODEL LOADING")
+    print("loading model")
     model = torch.hub.load("facebookresearch/dinov2", arch)
     model_keys = set(model.state_dict().keys())
     print(f"{arch}: {len(model_keys)} params")

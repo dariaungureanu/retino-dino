@@ -106,7 +106,7 @@ def load_model(
     checkpoint: Optional[str],
     device: torch.device,
 ) -> torch.nn.Module:
-    print("  MODEL LOADING DIAGNOSTICS")
+    print("loading model")
     print(f"Architecture: {arch}")
     model = torch.hub.load("facebookresearch/dinov2", arch)
     model_keys = set(model.state_dict().keys())

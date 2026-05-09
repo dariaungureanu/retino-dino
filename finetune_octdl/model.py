@@ -19,7 +19,7 @@ def load_backbone(
 ) -> nn.Module:
     """Load DINOv2 backbone from torch.hub; optionally overwrite weights from
     a continual-pretraining checkpoint."""
-    print("  MODEL LOADING DIAGNOSTICS")
+    print("loading model")
     print(f"Architecture: {arch}")
     model = torch.hub.load("facebookresearch/dinov2", arch)
     model_keys = set(model.state_dict().keys())

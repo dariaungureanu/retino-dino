@@ -208,8 +208,8 @@ def main():
         )
 
         print(f"\nEpoch {epoch}/{args.epochs} Results:")
-        print(f"   [Train] Loss: {t_loss:.3f} | Disease F1: {t_f1_d:.3f}")
-        print(f"   [Val]   Loss: {v_loss:.3f} | Disease F1: {v_f1_d:.3f} (Best: {best_f1:.3f})")
+        print(f"[Train] Loss: {t_loss:.3f} | Disease F1: {t_f1_d:.3f}")
+        print(f"[Val]   Loss: {v_loss:.3f} | Disease F1: {v_f1_d:.3f} (Best: {best_f1:.3f})")
 
         wandb.log({
             "epoch": epoch,
