@@ -228,6 +228,23 @@ def select_top_errors(y_true, y_pred, y_conf, indices, topk=8, class_idx=None):
     return wrong_indices[order[:topk]]
 
 
+def select_top_correct(y_true, y_pred, y_conf, indices, topk=8, class_idx=None):
+    """Top-K most confident correct predictions, optionally restricted to one class."""
+    if class_idx is not None:
+        mask = (y_true == class_idx) & (y_pred == class_idx)
+    else:
+        mask = (y_true == y_pred) & (y_true != IGNORE_INDEX)
+
+    sel = indices[mask]
+    confs = y_conf[mask]
+
+    if len(sel) == 0:
+        return np.array([], dtype=int)
+
+    order = np.argsort(-confs)
+    return sel[order[:topk]]
+
+
 def generate_gradcam_grid(
     model, dataset, sample_indices, head_index, label_map,
     task_name, save_path, device,
@@ -372,7 +389,7 @@ def main():
 
     if not args.skip_gradcam:
         print("gradcam error analysis")
-        # Top disease errors
+        # Disease head: top errors and top correct predictions
         y_true_d, y_pred_d, y_conf_d, idx_d = collect_predictions(
             model, test_loader, device, head_index=0,
         )
@@ -384,8 +401,16 @@ def main():
             task_name="Disease", device=device,
             save_path=os.path.join(args.out_dir, "gradcam_disease_top_errors.png"),
         )
+        top_correct_d = select_top_correct(
+            y_true_d, y_pred_d, y_conf_d, idx_d, topk=args.gradcam_topk,
+        )
+        generate_gradcam_grid(
+            model, test_ds, top_correct_d, head_index=0, label_map=inv_disease,
+            task_name="Disease - Correct", device=device,
+            save_path=os.path.join(args.out_dir, "gradcam_disease_top_correct.png"),
+        )
 
-        # Top condition errors
+        # Condition head: top errors and top correct predictions
         y_true_c, y_pred_c, y_conf_c, idx_c = collect_predictions(
             model, test_loader, device, head_index=1,
         )
@@ -396,6 +421,14 @@ def main():
             model, test_ds, top_errors_c, head_index=1, label_map=inv_condition,
             task_name="Condition", device=device,
             save_path=os.path.join(args.out_dir, "gradcam_condition_top_errors.png"),
+        )
+        top_correct_c = select_top_correct(
+            y_true_c, y_pred_c, y_conf_c, idx_c, topk=args.gradcam_topk,
+        )
+        generate_gradcam_grid(
+            model, test_ds, top_correct_c, head_index=1, label_map=inv_condition,
+            task_name="Condition - Correct", device=device,
+            save_path=os.path.join(args.out_dir, "gradcam_condition_top_correct.png"),
         )
 
         # Per-class errors (optional)
