@@ -79,13 +79,21 @@ def main():
 
     # Load test data with patient IDs
     csv_path = os.path.join(args.data_path, "OCTDL_clean_metadata.csv")
-    _, _, test_df, _, _ = get_data_splits(csv_path)
+    train_df, _, test_df, _, _ = get_data_splits(csv_path)
     eval_transform = get_eval_transform(config["img_size"])
     test_ds = OCTDLMultiTaskDataset(
         test_df, args.data_path, eval_transform, disease_map, condition_map,
     )
     test_loader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False,
                              num_workers=args.num_workers, pin_memory=True)
+
+    disease_prior = np.zeros(len(disease_map), dtype=np.int64)
+    for cls_name, cls_idx in disease_map.items():
+        disease_prior[cls_idx] = int((train_df["label_disease"].astype(str) == cls_name).sum())
+    condition_prior = np.zeros(len(condition_map), dtype=np.int64)
+    for cls_name, cls_idx in condition_map.items():
+        condition_prior[cls_idx] = int((train_df["label_condition_raw"].astype(str) == cls_name).sum())
+    print(f"disease prior (train counts): {dict(zip([inv_disease[i] for i in range(len(disease_map))], disease_prior.tolist()))}")
 
     # Per-image predictions
     softmax = nn.Softmax(dim=1)
@@ -135,24 +143,47 @@ def main():
         )
         print(f"condition: Acc={img_c_acc*100:.1f}%  Macro-F1={img_c_f1:.4f}")
 
+    def majority_vote_with_prior(votes, prior):
+        """Most-frequent prediction across a patient's scans.
+        Ties are resolved in favour of the class with the larger training
+        prior; ties on prior fall back to the lower class index."""
+        counts = Counter(int(v) for v in votes)
+        max_count = max(counts.values())
+        candidates = [c for c, n in counts.items() if n == max_count]
+        if len(candidates) == 1:
+            return candidates[0], False
+        winner = max(candidates, key=lambda c: (prior[c], -c))
+        return winner, True
+
     print("patient-level metrics (majority vote)")
     patient_results = []
+    n_disease_ties = 0
+    n_condition_ties = 0
     for patient_id, group in test_df_reset.groupby("patient_id"):
         true_disease = group["true_disease"].mode().iloc[0]
         true_disease_name = inv_disease[true_disease]
 
-        pred_counts = Counter(group["pred_disease"])
-        pred_disease = pred_counts.most_common(1)[0][0]
+        pred_disease, was_tied_d = majority_vote_with_prior(
+            group["pred_disease"].values, disease_prior,
+        )
+        if was_tied_d:
+            n_disease_ties += 1
         pred_disease_name = inv_disease[pred_disease]
 
         avg_probs = all_probs_d[group.index].mean(axis=0)
-        pred_disease_avg = np.argmax(avg_probs)
+        pred_disease_avg = int(np.argmax(avg_probs))
         pred_disease_avg_name = inv_disease[pred_disease_avg]
 
         valid_conds = group[group["true_condition"] != IGNORE_INDEX]
         true_condition = valid_conds["true_condition"].mode().iloc[0] if len(valid_conds) > 0 else IGNORE_INDEX
-        pred_cond_counts = Counter(all_preds_c[valid_conds.index]) if len(valid_conds) > 0 else Counter()
-        pred_condition = pred_cond_counts.most_common(1)[0][0] if pred_cond_counts else IGNORE_INDEX
+        if len(valid_conds) > 0:
+            pred_condition, was_tied_c = majority_vote_with_prior(
+                all_preds_c[valid_conds.index], condition_prior,
+            )
+            if was_tied_c:
+                n_condition_ties += 1
+        else:
+            pred_condition = IGNORE_INDEX
 
         n_scans = len(group)
         n_correct = (group["pred_disease"] == group["true_disease"]).sum()
@@ -222,14 +253,29 @@ def main():
               f"{row['scan_accuracy']:.0%} ({row['n_scans']} scans) "
               f"True={row['true_disease_name']:>4} Pred={row['pred_disease_vote_name']:>4}")
 
-    # Patient-level confusion matrix
-    cm = confusion_matrix(pat_true_d, pat_pred_d_vote)
-    fig, ax = plt.subplots(figsize=(10, 8))
-    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
-                xticklabels=disease_names, yticklabels=disease_names, ax=ax)
-    ax.set_xlabel("Predicted", fontweight="bold")
-    ax.set_ylabel("True", fontweight="bold")
-    ax.set_title("patient-Level Disease Confusion Matrix\n(Majority Vote)", fontweight="bold")
+    print(f"\ntie-broken majority votes: disease={n_disease_ties}/{len(pat_df)} patients, "
+          f"condition={n_condition_ties}/{max(len(valid_pat), 1)} patients")
+
+    # Patient-level confusion matrices: majority-vote vs average-probability
+    cm_vote = confusion_matrix(pat_true_d, pat_pred_d_vote,
+                                labels=list(range(len(disease_map))))
+    cm_avg = confusion_matrix(pat_true_d, pat_pred_d_avg,
+                               labels=list(range(len(disease_map))))
+
+    fig, axes = plt.subplots(1, 2, figsize=(20, 8))
+    for ax, cm, strategy, acc, f1 in [
+        (axes[0], cm_vote, "Majority Vote", pat_d_acc_vote, pat_d_f1_vote),
+        (axes[1], cm_avg, "Average Probability", pat_d_acc_avg, pat_d_f1_avg),
+    ]:
+        sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
+                    xticklabels=disease_names, yticklabels=disease_names, ax=ax)
+        ax.set_xlabel("Predicted", fontweight="bold")
+        ax.set_ylabel("True", fontweight="bold")
+        ax.set_title(
+            f"patient-Level Disease - {strategy}\n"
+            f"Acc={acc:.1f}%  Macro-F1={f1:.4f}",
+            fontweight="bold",
+        )
     plt.tight_layout()
     cm_path = os.path.join(args.out_dir, "patient_confusion_disease.png")
     fig.savefig(cm_path, dpi=200, bbox_inches="tight")
