@@ -4,26 +4,27 @@ Loads any checkpoint from the fine-tuning pipeline and generates:
   1. t-SNE plots (disease + condition) of backbone features
   2. GradCAM on top-K most confident errors (disease + condition)
   3. GradCAM on per-class errors (optional, specify --gradcam_class)
+  4. GradCAM on correct (disease + condition)
 
 Usage:
     # Full analysis on Run C
     python finetune_octdl/analyse_explainability.py \
         --data_path /home/student/Ungureanu_Daria/OCTDL_Cleaned \
-        --checkpoint_dir saved_models/run_C_unfreeze2 \
-        --out_dir results/explainability/run_finetuning_C
+        --checkpoint_dir saved_models/octdl_domain_adapted_unfreeze2 \
+        --out_dir results/explainability/octdl_new
 
     # Only t-SNE
     python finetune_octdl/analyse_explainability.py \
         --data_path /home/student/Ungureanu_Daria/OCTDL_Cleaned \
-        --checkpoint_dir saved_models/run_C_unfreeze2 \
-        --out_dir results/explainability/run_finetuning_C \
+        --checkpoint_dir saved_models/octdl_domain_adapted_unfreeze2 \
+        --out_dir results/explainability/octdl_new \
         --skip_gradcam
 
     # Only GradCAM for a specific class
     python finetune_octdl/analyse_explainability.py \
         --data_path /home/student/Ungureanu_Daria/OCTDL_Cleaned \
-        --checkpoint_dir saved_models/run_C_unfreeze2 \
-        --out_dir results/explainability/run_finetuning_C \
+        --checkpoint_dir saved_models/octdl_domain_adapted_unfreeze2 \
+        --out_dir results/explainability/octdl_new \
         --skip_tsne --gradcam_class AMD
 
 """

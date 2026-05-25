@@ -7,7 +7,7 @@ Usage:
     python finetune_octdl/analyse_patient_level.py \
         --data_path /home/student/Ungureanu_Daria/OCTDL_Cleaned \
         --checkpoint_dir saved_models/octdl_domain_adapted_unfreeze2 \
-        --out_dir results/patient_level
+        --out_dir results/patient_level2
 """
 
 import argparse
