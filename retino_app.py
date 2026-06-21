@@ -22,6 +22,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
+from matplotlib.colors import to_rgba
+from matplotlib.patches import Patch
 import altair as alt
 import streamlit as st
 from PIL import Image
@@ -411,19 +413,21 @@ def _confidence_caption(container, max_conf, n_classes):
         container.caption(f"Top confidence only {max_conf*100:.0f}% on a {n_classes}-class head - head may be undertrained or input out-of-distribution.")
 
 
+DA_COLOR = "#1f77b4"
+IN_COLOR = "#ff7f0e"
+
+
 def _compare_bar_chart(probs_da, probs_in, classes, idx_da, idx_in, title=""):
     n = len(classes)
-    fig, ax = plt.subplots(figsize=(_BAR_FIG_W + 0.4, _BAR_ROW_H * n * 1.5 + _BAR_PAD_H))
+    fig, ax = plt.subplots(figsize=(_BAR_FIG_W + 1.9, _BAR_ROW_H * n * 1.5 + _BAR_PAD_H))
     y = np.arange(n)
     bar_h = 0.38
 
-    da_colors = ["#1f77b4"] * n
-    da_colors[idx_da] = "#d62728"
-    in_colors = ["#ff7f0e"] * n
-    in_colors[idx_in] = "#8b0000"
+    ax.barh(y - bar_h / 2, probs_da * 100.0, height=bar_h, color=DA_COLOR, edgecolor="none")
+    ax.barh(y + bar_h / 2, probs_in * 100.0, height=bar_h, color=IN_COLOR, edgecolor="none")
 
-    ax.barh(y - bar_h / 2, probs_da * 100.0, height=bar_h, color=da_colors, edgecolor="none", label="Domain-adapted")
-    ax.barh(y + bar_h / 2, probs_in * 100.0, height=bar_h, color=in_colors, edgecolor="none", label="ImageNet baseline")
+    ax.barh(y[idx_da] - bar_h / 2, probs_da[idx_da] * 100.0, height=bar_h, fill=False, edgecolor="#111111", linewidth=1.8)
+    ax.barh(y[idx_in] + bar_h / 2, probs_in[idx_in] * 100.0, height=bar_h, fill=False, edgecolor="#111111", linewidth=1.8)
 
     ax.set_yticks(y)
     ax.set_yticklabels([_truncate(c) for c in classes], fontsize=9)
@@ -438,23 +442,28 @@ def _compare_bar_chart(probs_da, probs_in, classes, idx_da, idx_in, title=""):
     for i, p in enumerate(probs_in * 100.0):
         ax.text(p + 1.0, i + bar_h / 2, f"{p:.0f}", va="center", fontsize=7)
 
-    ax.legend(loc="lower right", fontsize=8, frameon=False)
+    handles = [
+        Patch(color=DA_COLOR, label="Domain-adapted (DA)"),
+        Patch(color=IN_COLOR, label="ImageNet baseline (IN)"),
+        Patch(facecolor="none", edgecolor="#111111", label="top prediction"),
+    ]
+    ax.legend(handles=handles, loc="upper left", bbox_to_anchor=(1.01, 1.0), fontsize=8, frameon=False)
     ax.spines[["top", "right"]].set_visible(False)
-    fig.subplots_adjust(left=_BAR_LEFT, right=_BAR_RIGHT, bottom=_BAR_BOTTOM, top=_BAR_TOP)
+    fig.subplots_adjust(left=_BAR_LEFT, right=0.72, bottom=_BAR_BOTTOM, top=_BAR_TOP)
     return fig
 
 
 def _compare_multilabel_panel(probs_da, probs_in, labels, threshold=0.5, title=""):
     n = len(labels)
-    fig, ax = plt.subplots(figsize=(_BAR_FIG_W + 0.4, _BAR_ROW_H * n * 1.5 + _BAR_PAD_H))
+    fig, ax = plt.subplots(figsize=(_BAR_FIG_W + 1.9, _BAR_ROW_H * n * 1.5 + _BAR_PAD_H))
     y = np.arange(n)
     bar_h = 0.38
 
-    da_colors = ["#2ca02c" if p >= threshold else "#9aa0a6" for p in probs_da]
-    in_colors = ["#ff7f0e" if p >= threshold else "#cfd1d4" for p in probs_in]
+    da_colors = [to_rgba(DA_COLOR, 1.0 if p >= threshold else 0.3) for p in probs_da]
+    in_colors = [to_rgba(IN_COLOR, 1.0 if p >= threshold else 0.3) for p in probs_in]
 
-    ax.barh(y - bar_h / 2, probs_da * 100.0, height=bar_h, color=da_colors, edgecolor="none", label="Domain-adapted")
-    ax.barh(y + bar_h / 2, probs_in * 100.0, height=bar_h, color=in_colors, edgecolor="none", label="ImageNet baseline")
+    ax.barh(y - bar_h / 2, probs_da * 100.0, height=bar_h, color=da_colors, edgecolor="none")
+    ax.barh(y + bar_h / 2, probs_in * 100.0, height=bar_h, color=in_colors, edgecolor="none")
     ax.axvline(threshold * 100, color="#d62728", linestyle="--", linewidth=1, alpha=0.7)
 
     ax.set_yticks(y)
@@ -470,9 +479,13 @@ def _compare_multilabel_panel(probs_da, probs_in, labels, threshold=0.5, title="
     for i, p in enumerate(probs_in * 100.0):
         ax.text(p + 1.0, i + bar_h / 2, f"{p:.0f}", va="center", fontsize=7)
 
-    ax.legend(loc="lower right", fontsize=8, frameon=False)
+    handles = [
+        Patch(color=DA_COLOR, label="Domain-adapted (DA)"),
+        Patch(color=IN_COLOR, label="ImageNet baseline (IN)"),
+    ]
+    ax.legend(handles=handles, loc="upper left", bbox_to_anchor=(1.01, 1.0), fontsize=8, frameon=False)
     ax.spines[["top", "right"]].set_visible(False)
-    fig.subplots_adjust(left=_BAR_LEFT, right=_BAR_RIGHT, bottom=_BAR_BOTTOM, top=_BAR_TOP)
+    fig.subplots_adjust(left=_BAR_LEFT, right=0.72, bottom=_BAR_BOTTOM, top=_BAR_TOP)
     return fig
 
 
@@ -490,6 +503,7 @@ def render_predictions(spec, labels, preds, container, header, side_by_side=True
         c_conf = float(preds["condition"][c_idx])
         container.markdown(f"**Disease:** `{diseases[d_idx]}` ({d_conf*100:.1f}%)")
         container.markdown(f"**Condition:** `{conditions[c_idx]}` ({c_conf*100:.1f}%)")
+        container.caption("In each chart, the red bar is the predicted class.")
         if side_by_side:
             col_d, col_c = container.columns(2)
             col_d.pyplot(_bar_chart(preds["disease"], diseases, d_idx, "Disease head"), clear_figure=True)
@@ -506,6 +520,7 @@ def render_predictions(spec, labels, preds, container, header, side_by_side=True
         idx = int(np.argmax(preds["probs"]))
         conf = float(preds["probs"][idx])
         container.markdown(f"**Prediction:** `{classes[idx]}` ({conf*100:.1f}%)")
+        container.caption("The red bar is the predicted class.")
         col_chart, _ = container.columns([3, 2])
         col_chart.pyplot(_bar_chart(preds["probs"], classes, idx), clear_figure=True, use_container_width=False)
         _confidence_caption(container, conf, len(classes))
@@ -1022,7 +1037,6 @@ DATASETS_INFO = {
             "Condition head, 8 classes (only labels with at least 30 samples are kept): MNV (macular neovascular membranes), suspected MNV, DRIL (disorganisation of retinal inner layers), drusen, ME (macular edema), MH (macular hole), ERM, normal.",
         ],
         "split": "Patient-level 70 / 10 / 20 split, stratified on disease: 1,410 train / 209 val / 445 test, from 574 / 82 / 165 patients.",
-        "caveat": "OCTDL training-partition images were also part of the SSL pre-training corpus, so absolute OCTDL numbers should be read against the ImageNet baseline - the DA vs IN gap is the meaningful comparison.",
     },
     "MMRDR": {
         "title": "MMRDR-OCT - DME severity grading",
@@ -1034,7 +1048,6 @@ DATASETS_INFO = {
             "Grade 2: Center-involved DME (CI-DME).",
         ],
         "split": "Released train/test split is at the image level (no patient IDs in the metadata): 2,376 train / 562 test. We carved a 10 % grade-stratified validation slice from the training pool.",
-        "caveat": "No MMRDR images were in the SSL pre-training corpus, so this is the clearest measure of how much medical pre-training helps.",
     },
     "Corina": {
         "title": "Suciu et al. (Corina) - DME biomarkers, multi-label",
@@ -1048,7 +1061,6 @@ DATASETS_INFO = {
             "A single scan can carry several biomarkers at once (e.g. DME + HF + ND), so the model output is a four-dimensional binary vector, not a single class.",
         ],
         "split": "Patient-level split released by the authors: 43 patients (2,682 images) for training, 9 patients (326 images) for test. We carved a 10 % patient-stratified validation slice from the training pool (stratification on each patient's most-frequent biomarker).",
-        "caveat": "Part of the Corina training partition entered the SSL pre-training corpus, so the DA vs IN comparison is the meaningful one here as well.",
     },
     "OCT5k": {
         "title": "OCT5k - AMD / drusen structural biomarkers, multi-label",
@@ -1065,7 +1077,6 @@ DATASETS_INFO = {
             "SDPED: soft drusen with pigment-epithelium detachment.",
         ],
         "split": "Patient-level 80 / 10 / 10 split: 42 / 6 / 12 patients = 399 / 60 / 107 scans.",
-        "caveat": "Small dataset (107 test scans), so absolute scores are conservative. Some OCT5k images were also in the SSL pre-training pool, so again the DA vs IN delta is the meaningful comparison.",
     },
 }
 
@@ -1090,10 +1101,36 @@ def main():
             font-size: 0.78rem;
             text-transform: uppercase;
         }
+        .hero-title { font-size: 2.6rem; font-weight: 700; color: #1f2430; margin: 0.2rem 0 0.1rem; }
+        .hero-sub { font-size: 1.15rem; color: #4338ca; font-weight: 500; margin-bottom: 1.4rem; }
+        .info-card {
+            background: #f4f5fb;
+            border: 1px solid #e5e7f2;
+            border-left: 3px solid #4338ca;
+            border-radius: 10px;
+            padding: 1.05rem 1.2rem;
+            height: 100%;
+        }
+        .info-card h4 { margin: 0 0 0.45rem; font-size: 0.78rem; letter-spacing: 0.04em;
+            text-transform: uppercase; color: #4338ca; }
+        .info-card p { margin: 0; color: #353a45; font-size: 0.95rem; line-height: 1.45; }
+        .step-num { color: #4338ca; font-weight: 700; }
+        .disclaimer {
+            background: #fff8ec;
+            border: 1px solid #f3e2bf;
+            border-radius: 8px;
+            padding: 0.6rem 0.9rem;
+            color: #7a5b16;
+            font-size: 0.88rem;
+        }
         </style>
         """,
         unsafe_allow_html=True,
     )
+
+    if not st.session_state.get("app_started"):
+        _render_landing()
+        return
 
     st.title("Retino-DINO")
     st.markdown(
@@ -1134,7 +1171,13 @@ def main():
                 sample_choice = None
 
         st.markdown("#### 3. Options")
-        compare = st.checkbox("Compare against ImageNet baseline", value=False)
+        compare = st.checkbox(
+            "Compare against ImageNet baseline",
+            value=False,
+            help="Off: show only the domain-adapted model (DA), the one trained on retinal scans. "
+                 "On: also run a generic ImageNet model (IN) side by side, to show how much the retinal "
+                 "adaptation helps. Results are labelled DA (blue) and IN (orange).",
+        )
 
         threshold = 0.5
         if spec["type"] == "multilabel":
@@ -1149,7 +1192,6 @@ def main():
             st.markdown(f"**Input:** {IMG_SIZE}x{IMG_SIZE}, ImageNet-norm")
             st.markdown(f"**Device:** `{DEVICE.type}`")
             st.markdown("**SSL data:** ~40 k retinal images, official DINOv2 repo with iBOT + KoLeo, 30 epochs.")
-            st.markdown("**Limitation:** subsets of OCT5k, OCTDL and Suciu et al. training images were in the SSL pre-training pool, so the DA vs IN comparison is the meaningful one.")
 
     tab_predict, tab_datasets, tab_latent, tab_reports, tab_perf = st.tabs(
         ["Analyse", "Task guide", "Latent space (OCTDL)", "Reports", "Performance"]
@@ -1228,7 +1270,11 @@ def main():
 
 def _resolve_targets(spec, labels_da, labels_in, preds_da, preds_in, auto_target, force_focus=False):
     if spec["type"] == "octdl":
-        kind = st.radio("GradCAM head", ["disease", "condition"], horizontal=True, format_func=str.capitalize)
+        kind = st.radio(
+            "Explain which prediction?", ["disease", "condition"], horizontal=True, format_func=str.capitalize,
+            help="Disease = the broad diagnosis (7 classes). Condition = the finer pathological finding (8 classes). "
+                 "The heatmap below explains the head you pick here.",
+        )
         classes_da = labels_da[kind]
         classes_in = labels_in[kind] if labels_in else classes_da
         if auto_target:
@@ -1271,15 +1317,14 @@ def _resolve_targets(spec, labels_da, labels_in, preds_da, preds_in, auto_target
 
 
 def _show_task_summary(spec):
-    st.markdown("### Task")
-    st.markdown(f"**{spec['label']}**")
+    st.markdown("**What it returns**")
     if spec["type"] == "octdl":
-        st.markdown(f"- Disease head - {len(spec['disease'])} classes: {', '.join(spec['disease'])}")
-        st.markdown(f"- Condition head - {len(spec['condition'])} classes: {', '.join(spec['condition'])}")
+        st.markdown(f"- A disease label, 1 of {len(spec['disease'])}: {', '.join(spec['disease'])}")
+        st.markdown(f"- A condition label, 1 of {len(spec['condition'])}: {', '.join(spec['condition'])}")
     elif spec["type"] == "single":
-        st.markdown(f"- {len(spec['classes'])} classes: {', '.join(spec['classes'])}")
+        st.markdown(f"- A severity grade, 1 of {len(spec['classes'])}: {', '.join(spec['classes'])}")
     else:
-        st.markdown(f"- {len(spec['biomarkers'])} independent biomarkers: {', '.join(spec['biomarkers'])}")
+        st.markdown(f"- A yes/no for each of {len(spec['biomarkers'])} biomarkers: {', '.join(spec['biomarkers'])}")
 
 
 def _run_analyse_body(image, source_name, expected_label, x, task_key, spec, compare, threshold, model_da, labels_da):
@@ -1296,17 +1341,38 @@ def _run_analyse_body(image, source_name, expected_label, x, task_key, spec, com
     if model_in is not None:
         preds_in = predict(model_in, x, spec["type"])
 
-    st.markdown("### Controls")
+    DISPLAY_HEIGHT = GRADCAM_HERO_W
+
+    st.markdown("### Prediction")
+    if model_in is not None:
+        st.caption(
+            "Comparison mode is on: domain-adapted model (DA) vs ImageNet baseline (IN). "
+            "Turn it off in the sidebar under Options."
+        )
+    st.image(_resize_to_height(image, DISPLAY_HEIGHT), caption=source_name or "Uploaded image")
+    if expected_label:
+        st.caption(f"Expected (from filename): **{expected_label}**")
+
+    if model_in is None:
+        render_predictions(spec, labels_da, preds_da, st, header=None, threshold=threshold, side_by_side=True)
+    else:
+        if spec["type"] == "multilabel":
+            st.caption("Blue = domain-adapted (DA), orange = ImageNet baseline (IN). Dashed red line = decision threshold; bars past it are called present. Faded bars are below threshold.")
+        else:
+            st.caption("Blue = domain-adapted (DA), orange = ImageNet baseline (IN). The black-outlined bar is each model's top prediction.")
+        render_predictions_compare(spec, labels_da, labels_in, preds_da, preds_in, st, threshold=threshold)
+
+    st.markdown("### Where the model looked")
+    st.caption("GradCAM highlights the regions that most influenced the prediction. Red/warm = strong contribution, blue/cool = weak.")
+
     auto_target = st.checkbox(
         "Auto-target each model's own predicted class (recommended)",
         value=True,
-        help="On: the GradCAM heatmap explains the class the model actually chose, so DA and IN can highlight different regions if they disagree. Off: you pick one class and both models are explained against it.",
+        help="On: the heatmap explains the class the model actually chose, so DA and IN can highlight different regions if they disagree. Off: you pick one class and both models are explained against it.",
     )
     target_kind, idx_da, idx_in, target_label_da, target_label_in, focus = _resolve_targets(
         spec, labels_da, labels_in, preds_da, preds_in, auto_target, force_focus=(model_in is not None),
     )
-
-    st.caption("GradCAM highlights the regions that most influenced the model's prediction. Red/warm = strong contribution, blue/cool = weak.")
 
     cam_da = None
     if spec["type"] != "multilabel" or focus:
@@ -1318,7 +1384,6 @@ def _run_analyse_body(image, source_name, expected_label, x, task_key, spec, com
         with st.spinner("Computing GradCAM (ImageNet)..."):
             cam_in = gradcam(model_in, x, spec["type"], target_kind, idx_in)
 
-    DISPLAY_HEIGHT = GRADCAM_HERO_W
     cam_h = Image.fromarray(cam_da) if cam_da is not None else None
     cam_in_h = Image.fromarray(cam_in) if cam_in is not None else None
 
@@ -1330,44 +1395,17 @@ def _run_analyse_body(image, source_name, expected_label, x, task_key, spec, com
                 model_da, x, labels_da["biomarkers"], preds_da["probs"], threshold,
             )
 
-    st.markdown("### Results")
     if model_in is None:
         if spec["type"] == "multilabel" and not focus:
-            col_orig, col_label = st.columns([2, 3])
-            with col_orig:
-                st.image(_resize_to_height(image, DISPLAY_HEIGHT), caption=source_name or "Uploaded image")
-                if expected_label:
-                    st.caption(f"Expected (from filename): **{expected_label}**")
-            with col_label:
-                st.markdown("**Original scan (left).** Each biomarker the model considers present gets its own GradCAM panel below the bar chart.")
-            render_predictions(spec, labels_da, preds_da, st, header="Predictions - domain-adapted", threshold=threshold)
-            st.markdown("##### Active biomarker GradCAMs")
+            st.caption("One heatmap per biomarker the model considers present.")
             render_multilabel_gradcam_grid(grid_panels, grid_fell_back, threshold, st)
         else:
-            col_orig, col_cam = st.columns([2, 3])
-            with col_orig:
-                st.image(_resize_to_height(image, DISPLAY_HEIGHT), caption=source_name or "Uploaded image")
-                if expected_label:
-                    st.caption(f"Expected (from filename): **{expected_label}**")
-            with col_cam:
-                st.image(_resize_to_height(cam_h, DISPLAY_HEIGHT), caption=f"GradCAM - {target_label_da}")
-            render_predictions(spec, labels_da, preds_da, st, header="Predictions - domain-adapted", threshold=threshold, side_by_side=True)
+            st.image(_resize_to_height(cam_h, DISPLAY_HEIGHT), caption=f"GradCAM - {target_label_da}")
     else:
-        st.image(_resize_to_height(image, DISPLAY_HEIGHT), caption=source_name or "Uploaded image")
-        if expected_label:
-            st.caption(f"Expected (from filename): **{expected_label}**")
-
-        st.markdown("##### Predictions - DA vs ImageNet baseline")
-        if spec["type"] == "multilabel":
-            st.caption("Blue bars are the domain-adapted model, orange bars are the ImageNet baseline. The dashed red line is the decision threshold; anything to the right of it is considered present by that model.")
-        else:
-            st.caption("Blue bars are the domain-adapted model, orange bars are the ImageNet baseline. The longest bar of each colour is that model's prediction.")
-        render_predictions_compare(spec, labels_da, labels_in, preds_da, preds_in, st, threshold=threshold)
-
-        st.markdown(
-            "##### GradCAM - each model on its own prediction"
+        st.caption(
+            "Each model is explained on its own prediction, so DA and IN can light up different regions."
             if auto_target
-            else "##### GradCAM - shared target"
+            else "Both models are explained against the same target class."
         )
         row_l, row_r = st.columns(2)
         row_l.image(cam_h, caption=f"DA - {target_label_da}", width=GRADCAM_HERO_W)
@@ -1393,21 +1431,77 @@ def _run_analyse_body(image, source_name, expected_label, x, task_key, spec, com
         st.warning(f"PDF export failed: {e}")
 
 
+def _render_landing():
+    st.markdown("<div class='hero-title'>Retino-DINO</div>", unsafe_allow_html=True)
+    st.markdown(
+        "<div class='hero-sub'>An AI second opinion for retinal OCT scans.</div>",
+        unsafe_allow_html=True,
+    )
+
+    c1, c2, c3 = st.columns(3)
+    c1.markdown(
+        "<div class='info-card'><h4>What it does</h4>"
+        "<p>Upload an eye scan and the model names the likely condition, then "
+        "highlights the regions it looked at to decide.</p></div>",
+        unsafe_allow_html=True,
+    )
+    c2.markdown(
+        "<div class='info-card'><h4>Who it is for</h4>"
+        "<p>Eye clinicians, as decision support. It is a prototype to assist a "
+        "read, not to replace a specialist's judgement.</p></div>",
+        unsafe_allow_html=True,
+    )
+    c3.markdown(
+        "<div class='info-card'><h4>What is behind it</h4>"
+        "<p>A vision model adapted on ~40k retinal images and fine-tuned on four "
+        "clinical tasks, from broad disease screening to specific biomarkers.</p></div>",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("#### How it works")
+    st.markdown(
+        "<span class='step-num'>1.</span> Pick a clinical task &nbsp;&nbsp; "
+        "<span class='step-num'>2.</span> Upload a scan or choose a sample &nbsp;&nbsp; "
+        "<span class='step-num'>3.</span> Read the prediction and the heatmap, then export a PDF.",
+        unsafe_allow_html=True,
+    )
+
+    st.write("")
+    start, _ = st.columns([1, 3])
+    if start.button("Start analysing a scan", type="primary", use_container_width=True):
+        st.session_state.app_started = True
+        st.rerun()
+
+    st.caption(
+        "Evaluating the research? The Performance and Latent space tabs hold the "
+        "thesis numbers and the domain-adapted vs ImageNet comparison."
+    )
+
+
 def _render_welcome(task_key, spec):
+    info = DATASETS_INFO.get(task_key, {})
     st.markdown(f"### {spec['label']}")
-    st.markdown(SIDEBAR_BLURBS.get(task_key, ""))
+    if info.get("use_for"):
+        st.markdown(f"**When to use this**")
+        st.markdown(info["use_for"])
+    else:
+        st.markdown(SIDEBAR_BLURBS.get(task_key, ""))
     _show_task_summary(spec)
-    st.info("Upload an OCT image or pick a sample from the sidebar to run the model. See the Task guide tab for more on each dataset.")
+    st.info("Upload an OCT image or pick a sample from the sidebar to run the model. Full dataset and evaluation detail is in the Task guide tab.")
 
 
 def _render_datasets_tab(current_task=None):
-    st.markdown("### Datasets")
-    st.caption("Reference for what each of the four tasks does, what kind of scans it was trained on, and where to be careful when reading the numbers.")
+    st.markdown("### Task guide")
+    st.caption("Start here to choose the task that matches your clinical question. The table is the quick version; expand a task for the full dataset and evaluation detail.")
 
-    with st.expander("Self-supervised pre-training corpus", expanded=False):
-        st.markdown(PRETRAIN_BLURB)
+    st.markdown("#### Which task do I pick?")
+    st.markdown(_md_table(
+        ["Task", "Use it when you want to..."],
+        [(f"`{key}`", DATASETS_INFO[key]["use_for"].replace("Use this when ", "").replace("Use this for ", "").rstrip("."))
+         for key in DATASETS_INFO],
+    ))
 
-    st.markdown("#### Fine-tuning datasets (one per task you can pick)")
+    st.markdown("#### Detail per task")
     for key, info in DATASETS_INFO.items():
         spec = TASKS[key]
         expanded = (key == current_task)
@@ -1416,17 +1510,20 @@ def _render_datasets_tab(current_task=None):
             header += " - currently selected"
         with st.expander(header, expanded=expanded):
             st.markdown(info["use_for"])
-            st.markdown(info["what"])
             for line in info["labels"]:
                 st.markdown(f"- {line}")
-            st.markdown(f"Split: {info['split']}")
-            st.markdown(f"Caveat: {info['caveat']}")
+            if st.checkbox("Show dataset & evaluation detail", key=f"detail_{key}"):
+                st.markdown(info["what"])
+                st.markdown(f"**Split:** {info['split']}")
+
+    with st.expander("Self-supervised pre-training corpus (for all tasks)", expanded=False):
+        st.markdown(PRETRAIN_BLURB)
 
 
 def _render_latent_tab():
     st.markdown("### Latent space (interactive) - OCTDL only")
     st.caption("Each dot is one OCT scan from the OCTDL test set, projected to 2D with UMAP and coloured by disease class. Drag to pan, scroll to zoom, click a class in the legend to isolate it.")
-    st.info("OCTDL-only: only OCTDL's 2D coordinates were saved during analysis, and OCTDL is the only single-label task where colouring a UMAP by class is meaningful. For MMRDR, Corina and OCT5k, static t-SNE plots are in the Reports tab under the Latent space (t-SNE) category.")
+    st.info("OCTDL-only: OCTDL is the only single-label task where colouring a UMAP by class is meaningful. For MMRDR, Corina and OCT5k, static t-SNE plots are in the Reports tab under the Latent space (t-SNE) category.")
     available = [(name, path) for name, path in LATENT_DIRS if os.path.isfile(path)]
     if not available:
         st.warning("No UMAP embeddings found under results/umap/.")

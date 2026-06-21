@@ -43,6 +43,7 @@ env/
 *.pth
 *.pt
 *.ckpt
+*.drawio
 checkpoints/
 OLD_PRETRAIN/saved_models/
 
