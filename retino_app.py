@@ -1101,8 +1101,24 @@ def main():
             font-size: 0.78rem;
             text-transform: uppercase;
         }
-        .hero-title { font-size: 2.6rem; font-weight: 700; color: #1f2430; margin: 0.2rem 0 0.1rem; }
-        .hero-sub { font-size: 1.15rem; color: #4338ca; font-weight: 500; margin-bottom: 1.4rem; }
+        @keyframes rdFadeUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes rdSheen {
+            from { background-position: 0% 50%; }
+            to   { background-position: 100% 50%; }
+        }
+        .hero-title {
+            font-size: 2.6rem; font-weight: 700; margin: 0.2rem 0 0.1rem;
+            background: linear-gradient(90deg, #1f2430 0%, #4338ca 50%, #1f2430 100%);
+            background-size: 220% auto;
+            -webkit-background-clip: text; background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: rdFadeUp 0.6s ease both, rdSheen 7s linear infinite alternate;
+        }
+        .hero-sub { font-size: 1.15rem; color: #4338ca; font-weight: 500; margin-bottom: 1.4rem;
+            animation: rdFadeUp 0.6s ease 0.08s both; }
         .info-card {
             background: #f4f5fb;
             border: 1px solid #e5e7f2;
@@ -1110,11 +1126,36 @@ def main():
             border-radius: 10px;
             padding: 1.05rem 1.2rem;
             height: 100%;
+            animation: rdFadeUp 0.5s ease both;
+            transition: transform 0.18s ease, box-shadow 0.18s ease, border-left-width 0.18s ease;
+        }
+        .info-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 24px rgba(67,56,202,0.13);
+            border-left-width: 6px;
         }
         .info-card h4 { margin: 0 0 0.45rem; font-size: 0.78rem; letter-spacing: 0.04em;
             text-transform: uppercase; color: #4338ca; }
         .info-card p { margin: 0; color: #353a45; font-size: 0.95rem; line-height: 1.45; }
+        .stat-strip { display: flex; gap: 0.9rem; flex-wrap: wrap; margin: 0.2rem 0 1.7rem; }
+        .stat-card {
+            flex: 1; min-width: 150px;
+            background: #ffffff;
+            border: 1px solid #e5e7f2;
+            border-top: 3px solid #4338ca;
+            border-radius: 10px;
+            padding: 0.9rem 1.05rem;
+            animation: rdFadeUp 0.5s ease both;
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+        .stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(67,56,202,0.11); }
+        .stat-num { font-size: 1.95rem; font-weight: 700; color: #4338ca; line-height: 1.1; }
+        .stat-label { font-size: 0.78rem; color: #6b7280; text-transform: uppercase;
+            letter-spacing: 0.03em; margin-top: 0.3rem; }
         .step-num { color: #4338ca; font-weight: 700; }
+        .stButton > button { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+        .stButton > button:hover { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(67,56,202,0.22); }
+        button[data-baseweb="tab"] { transition: color 0.15s ease; }
         .disclaimer {
             background: #fff8ec;
             border: 1px solid #f3e2bf;
@@ -1135,7 +1176,7 @@ def main():
     st.title("Retino-DINO")
     st.markdown(
         "<p class='small-caption'>"
-        "Decision-support tool for retinal OCT scans. Pick a clinical task on the left, upload a scan, and the app returns the model's prediction together with a heatmap of the regions it relied on."
+        "Decision-support tool for retinal OCT scans. The Analyse tab is the clinical workspace: pick a task, upload a scan, and read the prediction with a heatmap of the regions it relied on. The Task guide, Latent space, Reports and Performance tabs are the research layer, with the evidence behind the model."
         "</p>",
         unsafe_allow_html=True,
     )
@@ -1438,21 +1479,36 @@ def _render_landing():
         unsafe_allow_html=True,
     )
 
+    stats = [
+        ("4", "Clinical tasks"),
+        ("~40k", "Self-supervised images"),
+        ("0.845", "OCTDL disease macro-F1"),
+        ("22M", "Backbone parameters"),
+    ]
+    cards = "".join(
+        f"<div class='stat-card' style='animation-delay:{0.05*i:.2f}s'>"
+        f"<div class='stat-num'>{num}</div>"
+        f"<div class='stat-label'>{label}</div></div>"
+        for i, (num, label) in enumerate(stats)
+    )
+    st.markdown(f"<div class='stat-strip'>{cards}</div>", unsafe_allow_html=True)
+
     c1, c2, c3 = st.columns(3)
     c1.markdown(
-        "<div class='info-card'><h4>What it does</h4>"
+        "<div class='info-card' style='animation-delay:0.12s'><h4>What it does</h4>"
         "<p>Upload an eye scan and the model names the likely condition, then "
         "highlights the regions it looked at to decide.</p></div>",
         unsafe_allow_html=True,
     )
     c2.markdown(
-        "<div class='info-card'><h4>Who it is for</h4>"
-        "<p>Eye clinicians, as decision support. It is a prototype to assist a "
-        "read, not to replace a specialist's judgement.</p></div>",
+        "<div class='info-card' style='animation-delay:0.20s'><h4>Who it is for</h4>"
+        "<p>Two audiences, one tool. Clinicians use the Analyse tab as decision "
+        "support; reviewers use the comparison, performance and latent-space tabs "
+        "to weigh the evidence behind it.</p></div>",
         unsafe_allow_html=True,
     )
     c3.markdown(
-        "<div class='info-card'><h4>What is behind it</h4>"
+        "<div class='info-card' style='animation-delay:0.28s'><h4>What is behind it</h4>"
         "<p>A vision model adapted on ~40k retinal images and fine-tuned on four "
         "clinical tasks, from broad disease screening to specific biomarkers.</p></div>",
         unsafe_allow_html=True,
