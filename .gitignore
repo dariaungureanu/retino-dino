@@ -45,8 +45,6 @@ env/
 *.ckpt
 *.drawio
 checkpoints/
-OLD_PRETRAIN/saved_models/
-
 # Weights & Biases
 wandb/
 
