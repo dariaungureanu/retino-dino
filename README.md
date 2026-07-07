@@ -112,10 +112,9 @@ and place them at the repository root:
 ## Downloading checkpoints and figures
 
 The trained checkpoints and the pre-generated figure folders are **not** committed
-to this repository, since they are large binary/generated artifacts. Download them
-from the shared drive:
+to this repository, since they are large binary/generated artifacts. Download them from the shared drive: 
 
-    [GOOGLE DRIVE LINK](https://drive.google.com/file/d/1_IluJmHVu_aFH3UHOQriaRhzssT60KVb/view?usp=sharing)
+**[retino-dino-artifacts.zip](https://drive.google.com/file/d/1_IluJmHVu_aFH3UHOQriaRhzssT60KVb/view?usp=sharing)**
 
 The archive `retino-dino-artifacts.zip` unpacks to the following folders. Unzip it
 **at the repository root** (next to `retino_app.py`) so the relative paths resolve:
