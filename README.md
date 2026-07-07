@@ -1,4 +1,4 @@
-# Retinal OCT analysis with a domain-adapted DINOv2 backbone
+# Learning Retinal Imaging without Labels: Domain Adaptation of DINOv2 to OCT
 
 Three-stage pipeline: data preparation, continual DINOv2 self-supervised
 pre-training on OCT scans, and supervised fine-tuning of the resulting
