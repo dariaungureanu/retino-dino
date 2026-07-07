@@ -111,13 +111,16 @@ and place them at the repository root:
 
 ## Downloading checkpoints and figures
 
-The trained checkpoints and the pre-generated figure folders are **not** committed
-to this repository, since they are large binary/generated artifacts. Download them from the shared drive: 
+The trained checkpoints and pre-generated figure folders are **not** committed to
+this repository (they are large binary/generated artifacts). Download the archive:
 
-**[retino-dino-artifacts.zip](https://drive.google.com/file/d/1_IluJmHVu_aFH3UHOQriaRhzssT60KVb/view?usp=sharing)**
+**[retino-dino-artifacts.zip](https://drive.google.com/file/d/1_IluJmHVu_aFH3UHOQriaRhzssT60KVb/view?usp=sharing)** (Google Drive)
 
-The archive `retino-dino-artifacts.zip` unpacks to the following folders. Unzip it
-**at the repository root** (next to `retino_app.py`) so the relative paths resolve:
+Unzip it **at the repository root** (next to `retino_app.py`) so the relative paths resolve:
+
+    unzip retino-dino-artifacts.zip -d .
+
+The archive contains:
 
     checkpoints/                  # SSL backbone + 8 fine-tuned checkpoints (9 files)
     finetune_octdl/results/       # OCTDL figures (Reports tab)
@@ -130,9 +133,7 @@ After unzipping, the repository root should contain:
 
     retino_app.py
     requirements.txt
-    sample_images/       (already included in this archive)
-    checkpoints/         (from the download above)
-    finetune_*/results/  (from the download above)
-    results/umap/        (from the download above)
-
-    unzip retino-dino-artifacts.zip -d .
+    sample_images/       (already in this repository)
+    checkpoints/         (from the download)
+    finetune_*/results/  (from the download)
+    results/umap/        (from the download)
