@@ -79,3 +79,5 @@ Thumbs.db
 *.exe
 *.o
 *.a
+
+package_submission.ps1
