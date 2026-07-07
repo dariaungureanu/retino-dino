@@ -209,7 +209,7 @@ TASKS = {
         "label": "DME severity grading (3) - MMRDR",
         "type": "single",
         "ckpt_da": "mmrdr_da.pth",
-        "ckpt_in": "mmrd_in.pth",
+        "ckpt_in": "mmrdr_in.pth",
         "samples_subdir": "mmrdr",
         "classes": MMRDR_CLASSES,
         "gallery_dirs": [ _path("finetune_mmrdr", "results", "confusion_matrices"),

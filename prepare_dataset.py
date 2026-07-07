@@ -1,6 +1,10 @@
 import os
 import glob
+import argparse
 from pathlib import Path
+
+DEFAULT_SOURCE_DIR = "../combined/combined"
+DEFAULT_DEST_DIR = "../dinov2_dataset"
 
 
 def setup_dinov2_dataset(source_dir, dest_dir):
@@ -34,6 +38,10 @@ def setup_dinov2_dataset(source_dir, dest_dir):
 
 
 if __name__ == "__main__":
-    SOURCE_DIR = "../combined/combined"
-    DEST_DIR = "../dinov2_dataset"
-    setup_dinov2_dataset(SOURCE_DIR, DEST_DIR)
+    parser = argparse.ArgumentParser(description="Assemble the unlabeled SSL corpus (symlinks into train/all_scans/)")
+    parser.add_argument("--source", type=str, default=DEFAULT_SOURCE_DIR, help="Root of the combined dataset (expects a train/ subfolder)")
+    parser.add_argument("--dest", type=str, default=DEFAULT_DEST_DIR, help="Destination root for the DINOv2 symlink dataset")
+
+    args = parser.parse_args()
+
+    setup_dinov2_dataset(args.source, args.dest)
