@@ -62,6 +62,9 @@ datasets/
 *.png
 *.gif
 *.bmp
+# ...except the curated sample scans shipped with the Streamlit app
+!sample_images/
+!sample_images/**
 
 # Logs
 logs/
